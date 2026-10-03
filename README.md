@@ -240,6 +240,7 @@ The server caches responses so that extra browser tabs don't cost extra credits.
 ```text
 .
 ├── lib/
+│   ├── env-check.js      # Explains why credentials weren't found (missing .env, wrong name, …)
 │   └── opensky.js        # Talks to OpenSky: login token, fetching, array → object conversion
 ├── public/
 │   └── index.html        # The web page (a placeholder until Stage 3)
@@ -259,7 +260,7 @@ The server caches responses so that extra browser tabs don't cost extra credits.
 
 | Message | What it means / what to do |
 | ------- | -------------------------- |
-| `No OpenSky credentials found` | `.env` is missing or empty. Check that it's named exactly `.env` (not `.env.txt`) and is in the project folder. |
+| `No OpenSky credentials found` | Read the **Why:** line under the warning: it names the exact problem (no `.env` file, `.env.txt`, values typed into `.env.example`, empty values, misspelled names, or the wrong file format). After fixing, restart the server: `.env` is only read at startup. |
 | `OpenSky login failed (HTTP 401)` | The client ID or secret is wrong. Copy them again from your OpenSky account page. |
 | `out of API credits (HTTP 429)` | You've used today's credits. Wait for the time shown, or add credentials to get 10× more. |
 | `Could not reach OpenSky` | No internet connection, or a firewall is blocking `opensky-network.org`. |
