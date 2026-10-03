@@ -22,6 +22,17 @@ export async function fetchMapConfig() {
 }
 
 /**
+ * Ask our server for the weather at Muscat airport (see /api/weather).
+ * When the server has no weather at all, it answers 503 with
+ * { error, metar: null, taf: null }; we pass that on as normal data, so the
+ * page can show "Weather unavailable". Only throws if our server can't be reached.
+ */
+export async function fetchWeatherData() {
+  const response = await fetch('/api/weather');
+  return response.json();
+}
+
+/**
  * Ask our server for the current aircraft.
  * Resolves to the JSON from /api/aircraft:
  *   { timestamp, aircraftCount, creditsRemaining, rateLimited, retryAfterSeconds, fromCache, aircraft }

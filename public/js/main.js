@@ -13,14 +13,15 @@
 import { focusAircraft, initAircraft, moveAircraftForward, updateAircraft } from './aircraft.js';
 import { initAirport, updateAirport } from './airport.js';
 import { summariseAirspace } from './airspace.js';
-import { fetchAircraftData, fetchMapConfig } from './api.js';
+import { fetchAircraftData, fetchMapConfig, fetchWeatherData } from './api.js';
 import { loadBorders } from './borders.js';
-import { ANIMATION_INTERVAL_MS, REFRESH_INTERVAL_MS } from './config.js';
+import { ANIMATION_INTERVAL_MS, REFRESH_INTERVAL_MS, WEATHER_REFRESH_INTERVAL_MS } from './config.js';
 import { refreshPopupPadding } from './layout.js';
 import { playIntro } from './intro.js';
 import { createMap } from './map.js';
 import { highlightSelectedRow, initPanel, updatePanel } from './panel.js';
 import { showConnectionProblem, showStatus } from './status.js';
+import { showWeather, showWeatherUnavailable } from './weather-strip.js';
 
 // Start downloading the country borders for the opening animation right away,
 // so the download happens while everything else is being set up.
@@ -109,6 +110,29 @@ refresh(); // first load: runs in the background while the opening animation pla
 // Smooth motion: move every plane a little along its track once per second.
 // (setInterval is fine here: moving planes is instant, so calls can't overlap.)
 setInterval(moveAircraftForward, ANIMATION_INTERVAL_MS);
+
+// ---------------------------------------------------------------------------
+// Weather: a separate, slower refresh (every 10 minutes)
+// ---------------------------------------------------------------------------
+
+let hasWeather = false; // have we shown weather at least once?
+
+async function refreshWeather() {
+  try {
+    const data = await fetchWeatherData();
+    showWeather(data);
+    hasWeather = data.metar !== null;
+  } catch (error) {
+    // Our own server can't be reached. Keep showing the last weather if we
+    // have some (the status bar already says "Connection lost").
+    if (!hasWeather) {
+      showWeatherUnavailable(`Could not reach the server (${error.message})`);
+    }
+  }
+}
+
+refreshWeather();
+setInterval(refreshWeather, WEATHER_REFRESH_INTERVAL_MS);
 
 // The opening animation: borders draw in, then everything fades in.
 playIntro(map, bordersPromise);

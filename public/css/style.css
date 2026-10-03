@@ -35,6 +35,12 @@
   /* The "live" dot in the status bar */
   --color-live: #22c55e;
 
+  /* Flight categories (standard aviation weather colours) */
+  --color-vfr: #22c55e;
+  --color-mvfr: #38bdf8;
+  --color-ifr: #ef4444;
+  --color-lifr: #d946ef;
+
   /* A plane's colour. The .alt-* classes below change it per plane; planes
      with an unknown altitude keep this default. */
   --color-plane: var(--color-text);
@@ -370,8 +376,7 @@ body {
   height: var(--status-bar-height);
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  gap: 16px;
   padding: 0 16px;
   background: rgba(18, 24, 33, 0.9);
   border-bottom: 1px solid var(--color-border);
@@ -439,8 +444,87 @@ body {
 
 .status-stats {
   display: flex;
+  flex: none;
   gap: 18px;
   margin: 0;
+}
+
+/* --------------------------------------------------------------------------
+   Weather strip (in the status bar)
+   -------------------------------------------------------------------------- */
+
+/* It's a <button>, so reset the browser's button styling first */
+.weather-strip {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto; /* pushes the strip and the stats to the right-hand side */
+  padding: 5px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: rgba(11, 15, 20, 0.5);
+  color: var(--color-text);
+  font: 500 12px/1 var(--font-mono);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: border-color var(--transition-fast), background var(--transition-fast);
+}
+
+.weather-strip:hover {
+  border-color: var(--color-accent);
+  background: var(--color-panel-hover);
+}
+
+.weather-strip:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.weather-strip[data-state='loading'],
+.weather-strip[data-state='unavailable'] {
+  color: var(--color-text-secondary);
+}
+
+.weather-strip[data-state='unavailable'] {
+  color: var(--color-warning);
+}
+
+/* The flight category badge: dark text on the category's colour */
+.flight-category {
+  padding: 3px 6px;
+  border-radius: 4px;
+  background: var(--color-text-secondary); /* unknown category: grey */
+  color: var(--color-background);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.flight-category[data-category='VFR'] {
+  background: var(--color-vfr);
+}
+
+.flight-category[data-category='MVFR'] {
+  background: var(--color-mvfr);
+}
+
+.flight-category[data-category='IFR'] {
+  background: var(--color-ifr);
+}
+
+.flight-category[data-category='LIFR'] {
+  background: var(--color-lifr);
+}
+
+.wx-age {
+  color: var(--color-text-secondary);
+  font-size: 10px;
+}
+
+/* Over 90 minutes old (or the weather service is unreachable) */
+.wx-age.is-old {
+  color: var(--color-warning);
 }
 
 /* Each stat: a tiny label above its value, like an instrument readout */
@@ -1025,13 +1109,48 @@ body {
     font-size: 14px;
   }
 
-  /* Not enough room for both: show the warning message instead of the title */
-  .status-bar.has-message .status-title h1 {
-    display: none;
+  /* There isn't room for the title, the weather strip AND the stats on a
+     phone, so the title is hidden from view (screen readers still read it;
+     these are the same rules as .sr-only). The live dot stays. */
+  .status-title h1 {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  .status-bar {
+    gap: 8px;
+    padding: 0 10px;
+  }
+
+  /* The title area may shrink (e.g. for a long warning message), but never
+     below the width of the live dot */
+  .status-title {
+    min-width: 8px;
   }
 
   .status-stats {
-    gap: 12px;
+    gap: 8px;
+  }
+
+  .status-stats dd {
+    font-size: 12px;
+  }
+
+  /* On phones the strip shows just the flight category and the wind */
+  .weather-strip {
+    gap: 6px;
+    padding: 4px 7px;
+    font-size: 11px;
+  }
+
+  .wx-temp,
+  .wx-vis,
+  .wx-age {
+    display: none;
   }
 
   /* The sheet is always full height; when closed it's pushed down so only
@@ -1141,6 +1260,18 @@ body {
   .scanning {
     top: 45%;
     left: 50%;
+  }
+}
+
+/* Very narrow phones: slightly smaller numbers in the status bar, so the
+   weather strip still fits even with a long wind like "320° 12kt G20" */
+@media (max-width: 380px) {
+  .status-stats dd {
+    font-size: 11px;
+  }
+
+  .status-stats dt {
+    font-size: 8px;
   }
 }
 

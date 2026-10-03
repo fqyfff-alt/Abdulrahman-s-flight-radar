@@ -300,6 +300,8 @@ each other, just like the server code.
 | `public/js/layout.js` | Works out which parts of the map the panels cover, so popups and fly‑to avoid them |
 | `public/js/borders.js` | Downloads the country outlines (TopoJSON), picks Oman and its neighbours, draws them as SVG paths |
 | `public/js/intro.js` | The opening animation: the line‑drawing timeline, map lock, skip, and fallbacks |
+| `public/js/weather-format.js` | Weather text: wind (`320° 12kt G20`), visibility, temperature, report age, flight category meanings |
+| `public/js/weather-strip.js` | The weather strip in the status bar |
 | `public/js/api.js` | Talks to our server (`/api/config`, `/api/aircraft`) |
 
 ---
@@ -497,8 +499,8 @@ stages like the rest of the project:
 | ----- | ------------ | ------ |
 | W1 | Test script that fetches the METAR and TAF once and prints them | ✅ done |
 | W2 | `GET /api/weather` on the server (cleaned data, 10‑minute cache) | ✅ done |
-| W3 | Weather strip in the status bar | ⏳ next |
-| W4 | Weather panel with a METAR explainer | |
+| W3 | Weather strip in the status bar | ✅ done |
+| W4 | Weather panel with a METAR explainer | ⏳ next |
 | W5 | Wind arrow, likely runway in use, and crosswind on the map | |
 | W6 | Weather alerts | |
 
@@ -605,6 +607,34 @@ If the weather service is down and nothing is cached yet, the endpoint answers
 **HTTP 503** with `{ "error": "…", "metar": null, "taf": null }`, so the page can show
 "no weather" instead of breaking. After a failure, the server waits 60 seconds before
 trying the weather service again.
+
+### Weather stage W3: the weather strip in the status bar
+
+```bash
+npm start
+```
+
+Open <http://localhost:3000>. After the opening animation, the status bar has a new strip
+just left of the aircraft stats:
+
+```text
+[VFR] 010° 7kt  33°C  10+ km  updated 41 min ago
+```
+
+| Part | Meaning |
+| ---- | ------- |
+| **Flight category badge** | How good the weather is for flying, from the cloud ceiling and visibility: **VFR** green (good), **MVFR** blue (marginal), **IFR** red (poor, pilots fly by instruments), **LIFR** magenta (very poor). Hover over the strip for the definition. |
+| **Wind** | Direction the wind blows **from**, then speed in knots: `320° 12kt G20` = from 320°, 12 knots, gusting 20. `VRB 3kt` = variable direction; `Calm` = no wind. |
+| **Temperature** | In °C. |
+| **Visibility** | In km; `10+ km` means 10 km or more. |
+| **updated X min ago** | Age of the METAR. It turns **amber** if the report is over 90 minutes old, or if the weather service couldn't be reached and the server is showing the last report it had. |
+
+While the first weather is loading the strip says **Fetching weather…**, and if there's no
+weather at all it says **Weather unavailable** in amber (hover to see why). The page asks
+for new weather every 10 minutes, separately from the 30‑second aircraft refresh.
+
+On phones there's only room for the badge and the wind, so the "Muscat Airspace" title is
+hidden from view (screen readers still read it); the live dot stays.
 
 ---
 

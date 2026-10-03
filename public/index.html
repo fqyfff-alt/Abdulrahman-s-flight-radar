@@ -44,6 +44,12 @@
         <!-- role="status" makes screen readers announce changes to this text -->
         <span class="status-message" id="status-message" role="status"></span>
       </div>
+      <!-- Weather at Muscat airport (weather-strip.js fills it in). It's a button
+           because clicking it will open the weather panel. -->
+      <button type="button" class="weather-strip" id="weather-strip" data-state="loading">
+        Fetching weather…
+      </button>
+
       <!-- A <dl> (description list) holds label/value pairs: <dt> label, <dd> value -->
       <dl class="status-stats">
         <div class="stat"><dt>Aircraft</dt><dd id="stat-aircraft">–</dd></div>

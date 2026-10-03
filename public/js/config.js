@@ -42,6 +42,14 @@ export const TILE_ATTRIBUTION =
 // brand-new data and costs 1 OpenSky credit.
 export const REFRESH_INTERVAL_MS = 30_000;
 
+// How often to ask our server for the airport weather. METARs only change
+// every 30–60 minutes, and the server caches them for 10 minutes too.
+export const WEATHER_REFRESH_INTERVAL_MS = 10 * 60_000;
+
+// Weather reports older than this are shown in amber, as a warning that they
+// may be out of date (normally a new METAR arrives every 30–60 minutes).
+export const WEATHER_OLD_AFTER_MINUTES = 90;
+
 // ---------------------------------------------------------------------------
 // Aircraft appearance and motion
 // ---------------------------------------------------------------------------
