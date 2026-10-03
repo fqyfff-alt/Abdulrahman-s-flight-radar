@@ -263,6 +263,7 @@ The server caches responses so that extra browser tabs don't cost extra credits.
 | `OpenSky login failed (HTTP 401)` | The client ID or secret is wrong. Copy them again from your OpenSky account page. |
 | `out of API credits (HTTP 429)` | You've used today's credits. Wait for the time shown, or add credentials to get 10× more. |
 | `Could not reach OpenSky` | No internet connection, or a firewall is blocking `opensky-network.org`. |
+| `npm.ps1 cannot be loaded because running scripts is disabled on this system` (Windows) | PowerShell blocks script files by default, and `npm` starts from one. Run `Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned` once (answer `Y`), or type `npm.cmd` instead of `npm`. |
 | `Cannot find package 'dotenv'` or `'express'` | Run `npm install` first. |
 | `Port 3000 is already in use` | The server is probably already running in another terminal window. Stop it with Ctrl+C there, or add `PORT=3001` to `.env` and open <http://localhost:3001>. |
 | Browser says *can't connect to localhost* | The server isn't running. Start it with `npm start` and keep that terminal open. |
