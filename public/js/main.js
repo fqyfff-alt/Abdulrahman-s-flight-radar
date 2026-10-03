@@ -1,22 +1,24 @@
 /**
  * main.js — the starting point of the web page.
  *
- * It creates the map, then asks our server for aircraft every 30 seconds and
- * hands them to aircraft.js to draw.
+ * It creates the map, asks our server for aircraft every 30 seconds and hands
+ * them to aircraft.js to draw, and moves the planes forward every second in
+ * between so they glide instead of jumping.
  *
  * Because index.html loads this file with type="module", it runs only after
  * the whole page has been read, so <div id="map"> already exists.
  */
 
-import { updateAircraft } from './aircraft.js';
+import { initAircraft, moveAircraftForward, updateAircraft } from './aircraft.js';
 import { fetchAircraftData, fetchMapConfig } from './api.js';
-import { REFRESH_INTERVAL_MS } from './config.js';
+import { ANIMATION_INTERVAL_MS, REFRESH_INTERVAL_MS } from './config.js';
 import { createMap } from './map.js';
 
 // Get the map-tile key from our server first, then build the map with it.
 // ("await" at the top level of a file is allowed in modules.)
 const mapConfig = await fetchMapConfig();
 const map = createMap(mapConfig);
+initAircraft(map);
 
 let refreshTimer = null; // the scheduled next refresh (so we can cancel it)
 let isRefreshing = false; // true while a request is on its way
@@ -30,7 +32,7 @@ async function refresh() {
 
   try {
     const data = await fetchAircraftData();
-    updateAircraft(map, data.aircraft);
+    updateAircraft(data.aircraft);
     logUpdate(data);
   } catch (error) {
     // Keep showing the last known planes; we'll try again next time.
@@ -79,3 +81,7 @@ function logUpdate(data) {
 }
 
 refresh(); // first load
+
+// Smooth motion: move every plane a little along its track once per second.
+// (setInterval is fine here: moving planes is instant, so calls can't overlap.)
+setInterval(moveAircraftForward, ANIMATION_INTERVAL_MS);

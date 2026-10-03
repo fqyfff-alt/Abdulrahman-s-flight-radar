@@ -41,3 +41,33 @@ export const TILE_ATTRIBUTION =
 // caches OpenSky's answer for 20 s, so 30 s means each refresh normally gets
 // brand-new data and costs 1 OpenSky credit.
 export const REFRESH_INTERVAL_MS = 30_000;
+
+// ---------------------------------------------------------------------------
+// Aircraft appearance and motion
+// ---------------------------------------------------------------------------
+
+// Altitude colour bands, in feet. The colours themselves are the
+// --color-alt-* variables in style.css.
+//   on the ground → grey,  below 10,000 → green,
+//   10,000–25,000 → amber, above 25,000 → blue
+export const LOW_ALTITUDE_MAX_FEET = 10_000;
+export const MID_ALTITUDE_MAX_FEET = 25_000;
+
+// Smooth motion: move every plane forward this often (milliseconds).
+export const ANIMATION_INTERVAL_MS = 1_000;
+
+// Never predict more than this many seconds past a plane's last reported
+// position. Normal data is under a minute old; anything older is too
+// uncertain to extrapolate further (the plane may have turned).
+export const MAX_PREDICTION_SECONDS = 120;
+
+// A plane whose last position report is older than this is drawn dimmed: a
+// "coasting" track, as air traffic controllers call it. Around Oman, OpenSky
+// often goes minutes without hearing from a plane, because ground receivers
+// are few and far between, especially over the sea.
+export const STALE_POSITION_SECONDS = 60;
+
+// Trails: how many reported positions to keep per plane. With one report per
+// 30-second refresh, 10 positions is about the last 5 minutes of flight.
+export const TRAIL_LENGTH = 10;
+export const TRAIL_MAX_OPACITY = 0.9; // the newest segment's opacity (1 = solid)

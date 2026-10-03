@@ -32,7 +32,8 @@
   --color-climb: #22c55e;
   --color-descend: #f59e0b;
 
-  /* Until Stage 4 colours planes by altitude, they're all this colour */
+  /* A plane's colour. The .alt-* classes below change it per plane; planes
+     with an unknown altitude keep this default. */
   --color-plane: var(--color-text);
 
   /* Fonts: Inter for words, JetBrains Mono for numbers so digits line up */
@@ -187,7 +188,13 @@ body {
   stroke: var(--color-background); /* thin dark outline so planes stand out on any tile */
   stroke-width: 1;
   stroke-linejoin: round;
-  transition: transform var(--transition-fast);
+  transition: transform var(--transition-fast), fill var(--transition-fast);
+}
+
+/* "Coasting" plane: no position report for over a minute, so it's drawn
+   faded to show that its position is only an estimate. */
+.plane-marker.is-stale .plane-icon {
+  opacity: 0.45;
 }
 
 /* Selected plane: a bit larger… */
@@ -232,6 +239,99 @@ body {
 
 .show-labels .plane-label {
   display: block;
+}
+
+/* --------------------------------------------------------------------------
+   Altitude colours
+
+   Each class sets --color-plane. CSS variables are inherited (like text
+   colour), so everything inside an element with .alt-low that uses
+   var(--color-plane) turns green: the plane icon, its trail segments, and
+   the legend dots. aircraft.js and trails.js add these classes.
+   -------------------------------------------------------------------------- */
+
+.alt-ground {
+  --color-plane: var(--color-alt-ground);
+}
+
+.alt-low {
+  --color-plane: var(--color-alt-low);
+}
+
+.alt-mid {
+  --color-plane: var(--color-alt-mid);
+}
+
+.alt-high {
+  --color-plane: var(--color-alt-high);
+}
+
+/* --------------------------------------------------------------------------
+   Trails (each segment is an SVG line drawn by Leaflet)
+   -------------------------------------------------------------------------- */
+
+.trail {
+  /* A CSS "stroke" overrides the colour Leaflet writes into the SVG, so the
+     trail takes the plane's altitude colour. Opacity is set per segment in JS. */
+  stroke: var(--color-plane);
+  stroke-linecap: round;
+}
+
+/* --------------------------------------------------------------------------
+   Altitude legend (bottom-right corner)
+   -------------------------------------------------------------------------- */
+
+.legend {
+  position: fixed;
+  right: 16px;
+  bottom: 28px; /* just above the attribution line */
+  z-index: 1000;
+  padding: 10px 12px;
+  background: rgba(18, 24, 33, 0.85); /* --color-panel, slightly see-through */
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  backdrop-filter: blur(6px); /* blurs the map behind the box */
+  pointer-events: none; /* it's only information: let clicks reach the map */
+}
+
+.legend-title {
+  margin: 0 0 6px;
+  color: var(--color-text);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.legend-list {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--color-text-secondary);
+  font: 400 11px/1.3 var(--font-mono);
+}
+
+.legend-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-plane);
+}
+
+.legend-note {
+  margin: 8px 0 0;
+  padding-top: 6px;
+  border-top: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+  font-size: 11px;
 }
 
 /* --------------------------------------------------------------------------
@@ -316,6 +416,13 @@ body {
 
 .vs-level {
   color: var(--color-text-secondary);
+}
+
+.popup-note {
+  max-width: 230px;
+  margin: 10px 0 0;
+  color: var(--color-warning);
+  font-size: 12px;
 }
 
 .squawk-emergency {

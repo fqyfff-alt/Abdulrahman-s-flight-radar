@@ -42,6 +42,19 @@
       <button type="button" id="zoom-out" aria-label="Zoom out">−</button>
     </div>
 
+    <!-- Altitude colour key. Each dot gets its colour from the same .alt-*
+         classes the planes use, so the key always matches the map. -->
+    <aside class="legend" aria-label="Altitude colour key">
+      <h2 class="legend-title">Altitude</h2>
+      <ul class="legend-list">
+        <li class="alt-high"><span class="legend-dot"></span>Above 25,000 ft</li>
+        <li class="alt-mid"><span class="legend-dot"></span>10,000–25,000 ft</li>
+        <li class="alt-low"><span class="legend-dot"></span>Below 10,000 ft</li>
+        <li class="alt-ground"><span class="legend-dot"></span>On ground</li>
+      </ul>
+      <p class="legend-note">Faded: no position for 1+ min</p>
+    </aside>
+
     <script
       src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
       integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="

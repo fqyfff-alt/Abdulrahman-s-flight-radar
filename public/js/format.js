@@ -6,6 +6,8 @@
  * minute for climb/descent, so we convert only at the moment we display.
  */
 
+import { LOW_ALTITUDE_MAX_FEET, MID_ALTITUDE_MAX_FEET } from './config.js';
+
 // ---------------------------------------------------------------------------
 // Unit conversions
 // ---------------------------------------------------------------------------
@@ -36,6 +38,37 @@ export function metresPerSecondToKnots(metresPerSecond) {
 
 export function metresPerSecondToFeetPerMinute(metresPerSecond) {
   return metresPerSecond * FEET_PER_MINUTE_PER_METRE_PER_SECOND;
+}
+
+// ---------------------------------------------------------------------------
+// Altitude colour bands
+// ---------------------------------------------------------------------------
+
+/**
+ * Which altitude band a plane is in: 'ground', 'low', 'mid', 'high', or
+ * 'unknown'. style.css turns each band into a colour through the classes
+ * .alt-ground, .alt-low, .alt-mid and .alt-high. (Unknown stays white.)
+ */
+export function getAltitudeBand(plane) {
+  if (plane.onGround) {
+    return 'ground';
+  }
+  const altitudeMetres = plane.baroAltitude ?? plane.geoAltitude; // prefer barometric
+  if (altitudeMetres === null) {
+    return 'unknown';
+  }
+  // Round first, so the colour always matches the number shown in the popup.
+  // (Without rounding, 7,620 m converts to 25,000.0008 ft: displayed as
+  // "25,000 ft" but coloured as "above 25,000". Transponders report altitude
+  // in 25 ft steps, so exactly 25,000 ft is common.)
+  const altitudeFeet = Math.round(metresToFeet(altitudeMetres));
+  if (altitudeFeet < LOW_ALTITUDE_MAX_FEET) {
+    return 'low';
+  }
+  if (altitudeFeet <= MID_ALTITUDE_MAX_FEET) {
+    return 'mid';
+  }
+  return 'high';
 }
 
 // ---------------------------------------------------------------------------
@@ -104,6 +137,14 @@ export function describeVerticalRate(metresPerSecond) {
   }
   // formatNumber keeps the minus sign for negative numbers.
   return { trend: 'descend', label: 'descending', arrow: '▼', text: `${formatNumber(feetPerMinute)} fpm` };
+}
+
+/** A duration for display: 45 → "45 s", 250 → "4 min". */
+export function formatAge(seconds) {
+  if (seconds < 60) {
+    return `${Math.round(seconds)} s`;
+  }
+  return `${Math.floor(seconds / 60)} min`;
 }
 
 /**

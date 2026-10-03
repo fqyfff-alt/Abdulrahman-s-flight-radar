@@ -11,8 +11,8 @@ It's being built in stages so each part can be tested before the next one starts
 | 1 | Test script that fetches the data once and prints a table in the terminal | ✅ done |
 | 2 | Backend server with `GET /api/aircraft` (caching, rate‑limit handling) | ✅ done |
 | 3 | Basic map with the dark theme, plane markers, and popups | ✅ done |
-| 4 | Altitude colours, legend, smooth motion, and trails | ⏳ next |
-| 5 | Side panel, status bar, airport marker, range rings, arrivals estimate | |
+| 4 | Altitude colours, legend, smooth motion, and trails | ✅ done |
+| 5 | Side panel, status bar, airport marker, range rings, arrivals estimate | ⏳ next |
 | 6 | Opening animation that draws the country borders | |
 
 ---
@@ -290,8 +290,73 @@ each other, just like the server code.
 | `public/js/config.js` | Settings: map centre, zoom levels, tile address, refresh interval |
 | `public/js/map.js` | Creates the Leaflet map, tiles, zoom buttons, label toggle |
 | `public/js/aircraft.js` | Plane markers: icon, rotation, popups, selection, add/update/remove |
-| `public/js/format.js` | Unit conversions (m → ft, m/s → kt, m/s → ft/min) and text formatting |
+| `public/js/format.js` | Unit conversions (m → ft, m/s → kt, m/s → ft/min), altitude bands, text formatting |
+| `public/js/geo.js` | Position maths: moving a point by distance and bearing, dead reckoning, stale positions |
+| `public/js/trails.js` | The fading trail behind each plane |
 | `public/js/api.js` | Talks to our server (`/api/config`, `/api/aircraft`) |
+
+---
+
+## Stage 4: colours, smooth motion, and trails
+
+```bash
+npm start
+```
+
+Open <http://localhost:3000>. What's new:
+
+- **Colours by altitude**, with a key in the bottom‑right corner:
+  grey = on the ground, green = below 10,000 ft, amber = 10,000–25,000 ft,
+  blue = above 25,000 ft. (White means the altitude is unknown.)
+- **Smooth motion.** Planes glide forward every second instead of jumping every 30 s.
+  Zoom in to level 10 or 11 to see it clearly.
+- **Trails.** A thin line behind each plane in its altitude colour, fading from solid
+  to transparent. It grows with each data update (one point every 30 s, up to 10
+  points ≈ 5 minutes), so give it a few minutes. A plane that climbs through
+  10,000 ft gets a trail that changes from green to amber.
+- **Faded planes.** If OpenSky hasn't received a plane's position for over a minute,
+  the plane is drawn faded and its popup says how old the position is.
+
+### How smooth motion works (dead reckoning)
+
+Between updates, each plane is moved using **dead reckoning**, the way navigators
+worked out their position before GPS:
+
+```text
+time since report = now − time of the plane's last position report
+distance          = ground speed × time since report
+new position      = last position, moved that distance along the track
+```
+
+To move a point, split the distance into a north part and an east part:
+
+```text
+metres north = distance × cos(track)
+metres east  = distance × sin(track)
+```
+
+Then convert metres to degrees. One degree of latitude is always about 111 km, but a
+degree of longitude shrinks towards the poles (111 km × cos(latitude)), which is about
+102 km at Muscat. `movePoint()` in `public/js/geo.js` has the full explanation with a
+diagram.
+
+When fresh data arrives, every plane is **corrected** to its newly reported position.
+A plane that turned since its last report jumps slightly; one flying straight hardly
+moves at all.
+
+### Why some planes are faded or stop moving
+
+OpenSky's data comes from volunteers' ground receivers, and there are few around Oman,
+especially over the sea. Often OpenSky goes a minute or more without hearing a plane's
+position. The app:
+
+- keeps predicting its position for up to **2 minutes** after the last report, then
+  stops (beyond that the plane could have turned anywhere), and
+- draws it **faded** after **1 minute**. Air traffic controllers call this a
+  *coasting* track: shown, but not to be trusted.
+
+You can change both limits in `public/js/config.js` (`MAX_PREDICTION_SECONDS` and
+`STALE_POSITION_SECONDS`).
 
 ---
 

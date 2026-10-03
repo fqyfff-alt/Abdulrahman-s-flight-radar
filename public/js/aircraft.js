@@ -2,18 +2,31 @@
  * aircraft.js — draws the aircraft on the map.
  *
  * Each aircraft gets one Leaflet marker: a plane icon rotated to its direction
- * of travel, a callsign label, and a popup with flight details. When new data
- * arrives we UPDATE existing markers instead of deleting and re-creating them,
- * which avoids flicker and keeps an open popup open.
+ * of travel and coloured by altitude, a callsign label, a popup with flight
+ * details, and a fading trail. When new data arrives we UPDATE existing
+ * markers instead of deleting and re-creating them, which avoids flicker and
+ * keeps an open popup open. Between updates, moveAircraftForward() nudges every
+ * plane along its track once per second.
  */
 
 import {
   describeVerticalRate,
   escapeHtml,
+  formatAge,
   formatAltitude,
   formatHeading,
   formatSpeed,
+  getAltitudeBand,
 } from './format.js';
+import { isPositionStale, predictPosition, secondsSincePositionReport } from './geo.js';
+import {
+  addTrailPoint,
+  createTrail,
+  drawTrail,
+  initTrails,
+  removeTrail,
+  updateTrailHead,
+} from './trails.js';
 
 // ---------------------------------------------------------------------------
 // The plane icon
@@ -88,6 +101,15 @@ function formatSquawkHtml(squawk) {
   return escapeHtml(squawk);
 }
 
+/** A warning line for planes whose position is old (empty text otherwise). */
+function buildStaleNoteHtml(plane) {
+  if (!isPositionStale(plane)) {
+    return '';
+  }
+  const age = formatAge(secondsSincePositionReport(plane));
+  return `<p class="popup-note">No position update for ${age}, so this position is an estimate.</p>`;
+}
+
 /** The name we show for a plane: its callsign, or its ICAO address if it has none. */
 function displayName(plane) {
   return plane.callsign ?? plane.icao24.toUpperCase();
@@ -123,7 +145,8 @@ function buildPopupHtml(plane) {
 
       <dt>Squawk</dt>
       <dd>${formatSquawkHtml(plane.squawk)}</dd>
-    </dl>`;
+    </dl>
+    ${buildStaleNoteHtml(plane)}`;
   // Note: "Heading" here is really the TRACK (direction over the ground), which
   // is what OpenSky provides. See the trueTrack comment in lib/opensky.js.
 }
@@ -141,10 +164,29 @@ const aircraftByIcao = new Map();
 // icao24 of the plane whose popup is open, or null if none.
 let selectedIcao = null;
 
-/** Rotate the icon, set the label and tooltip, and refresh the popup text. */
+// The Leaflet map, saved by initAircraft().
+let map = null;
+
+// Every possible altitude class, so we can remove the old one before adding the new.
+const ALTITUDE_BAND_CLASSES = ['alt-ground', 'alt-low', 'alt-mid', 'alt-high', 'alt-unknown'];
+
+/** Call once at startup, after the map exists. */
+export function initAircraft(leafletMap) {
+  map = leafletMap;
+  initTrails(map);
+}
+
+/** Colour, rotate, label and tooltip the icon, and refresh the popup text. */
 function updateMarkerDetails(entry) {
   const { plane, marker } = entry;
   const element = marker.getElement(); // the marker's HTML element on the page
+
+  // Altitude colour: swap the old .alt-* class for the current one.
+  element.classList.remove(...ALTITUDE_BAND_CLASSES);
+  element.classList.add(`alt-${getAltitudeBand(plane)}`);
+
+  // Dim planes we haven't had a position for in a while.
+  element.classList.toggle('is-stale', isPositionStale(plane));
 
   // Rotate to the direction of travel. Planes on the ground sometimes have no
   // track; pointing them north is a reasonable fallback.
@@ -173,9 +215,12 @@ function setSelected(icao24, isSelected) {
   entry.marker.setZIndexOffset(isSelected ? 1000 : 0);
 }
 
-/** Create a marker for a plane we haven't seen before. */
-function addAircraft(map, plane) {
-  const marker = L.marker([plane.latitude, plane.longitude], {
+/** Create a marker (and trail) for a plane we haven't seen before. */
+function addAircraft(plane) {
+  // Draw it where we estimate it is NOW, not where it was when last reported.
+  const currentPosition = predictPosition(plane);
+
+  const marker = L.marker(currentPosition, {
     icon: createPlaneIcon(),
     keyboard: true, // can be reached with Tab and opened with Enter
     riseOnHover: true, // hovered plane is drawn on top of its neighbours
@@ -193,16 +238,48 @@ function addAircraft(map, plane) {
 
   marker.addTo(map); // the marker's HTML element exists only after this
 
-  const entry = { plane, marker };
+  const entry = { plane, marker, trail: createTrail() };
   aircraftByIcao.set(plane.icao24, entry);
   updateMarkerDetails(entry);
+
+  const band = getAltitudeBand(plane);
+  addTrailPoint(entry.trail, [plane.latitude, plane.longitude], band);
+  drawTrail(entry.trail, currentPosition);
 }
 
-/** Move an existing marker to the plane's new position and refresh its details. */
+/**
+ * New data for a plane we already show: correct its position, add the new
+ * report to its trail, and refresh its details.
+ */
 function updateExistingAircraft(entry, plane) {
+  const band = getAltitudeBand(plane);
+
+  // Only add a trail point if this is a NEW position report. OpenSky sometimes
+  // repeats an old position, which would put two identical points in the trail.
+  if (plane.timePosition !== entry.plane.timePosition) {
+    addTrailPoint(entry.trail, [plane.latitude, plane.longitude], band);
+  }
+
   entry.plane = plane;
-  entry.marker.setLatLng([plane.latitude, plane.longitude]);
+  const currentPosition = predictPosition(plane);
+  entry.marker.setLatLng(currentPosition); // the "correction" after predicting
   updateMarkerDetails(entry);
+  drawTrail(entry.trail, currentPosition);
+}
+
+/**
+ * Smooth motion: called every second by main.js. Moves each plane to its
+ * dead-reckoning position (see predictPosition in geo.js) and keeps the end of
+ * its trail attached to it.
+ */
+export function moveAircraftForward() {
+  for (const entry of aircraftByIcao.values()) {
+    const currentPosition = predictPosition(entry.plane);
+    entry.marker.setLatLng(currentPosition);
+    updateTrailHead(entry.trail, currentPosition);
+    // A plane can become stale between data updates, so check every second.
+    entry.marker.getElement()?.classList.toggle('is-stale', isPositionStale(entry.plane));
+  }
 }
 
 /**
@@ -212,7 +289,7 @@ function updateExistingAircraft(entry, plane) {
  *   - planes that are no longer in the list (they left the area or stopped
  *     transmitting) are removed.
  */
-export function updateAircraft(map, aircraftList) {
+export function updateAircraft(aircraftList) {
   const icaosInNewData = new Set();
 
   for (const plane of aircraftList) {
@@ -221,7 +298,7 @@ export function updateAircraft(map, aircraftList) {
     if (existing) {
       updateExistingAircraft(existing, plane);
     } else {
-      addAircraft(map, plane);
+      addAircraft(plane);
     }
   }
 
@@ -229,6 +306,7 @@ export function updateAircraft(map, aircraftList) {
   for (const [icao24, entry] of aircraftByIcao) {
     if (!icaosInNewData.has(icao24)) {
       entry.marker.remove(); // also closes its popup if it was open
+      removeTrail(entry.trail);
       aircraftByIcao.delete(icao24);
     }
   }
