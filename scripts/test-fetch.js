@@ -54,6 +54,7 @@ function toTableRow(plane) {
   }
 
   return {
+    ICAO24: plane.icao24,
     Callsign: plane.callsign ?? '—',
     Country: plane.originCountry,
     'Alt (ft)': altitudeFeet,
@@ -116,13 +117,11 @@ async function main() {
     // a negative result puts `a` first, a positive result puts `b` first.
     const sorted = [...aircraft].sort((a, b) => altitudeForSorting(b) - altitudeForSorting(a));
 
-    // Build an object keyed by icao24, so the table's first column is each
-    // aircraft's unique transponder address instead of 0, 1, 2…
-    const table = {};
-    for (const plane of sorted) {
-      table[plane.icao24] = toTableRow(plane);
-    }
-    console.table(table);
+    // Print an ARRAY of rows. (An earlier version used an object keyed by
+    // icao24, but JavaScript objects list keys that look like whole numbers,
+    // such as "500472", first, no matter when they were added. That broke
+    // the altitude sorting. Arrays always keep their order.)
+    console.table(sorted.map(toTableRow));
   }
 
   console.log(`\nAircraft with a position: ${aircraft.length}`);

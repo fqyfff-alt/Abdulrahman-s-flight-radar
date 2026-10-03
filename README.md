@@ -91,21 +91,22 @@ You should see something like this (real aircraft, so yours will differ):
 Fetching aircraft between latitude 22.5–24.5° N and longitude 57–60° E…
 Mode: authenticated (OAuth2 token)
 
-┌─────────┬──────────┬────────────────────────┬──────────┬────────────┬───────────┬───────────┬────────┬────────┬────────┐
-│ (index) │ Callsign │ Country                │ Alt (ft) │ Speed (kt) │ Track (°) │ V/S (fpm) │ Squawk │ Lat    │ Lon    │
-├─────────┼──────────┼────────────────────────┼──────────┼────────────┼───────────┼───────────┼────────┼────────┼────────┤
-│ 896714  │ 'ETD4UA' │ 'United Arab Emirates' │ 35000    │ 462        │ 70        │ 0         │ '1771' │ 23.54  │ 57.97  │
-│ 80044c  │ 'AXB545' │ 'India'                │ 32525    │ 426        │ 324       │ -1600     │ '—'    │ 24.009 │ 57.676 │
-└─────────┴──────────┴────────────────────────┴──────────┴────────────┴───────────┴───────────┴────────┴────────┴────────┘
+┌─────────┬──────────┬──────────┬─────────────────┬──────────┬────────────┬───────────┬───────────┬────────┬────────┬────────┐
+│ (index) │ ICAO24   │ Callsign │ Country         │ Alt (ft) │ Speed (kt) │ Track (°) │ V/S (fpm) │ Squawk │ Lat    │ Lon    │
+├─────────┼──────────┼──────────┼─────────────────┼──────────┼────────────┼───────────┼───────────┼────────┼────────┼────────┤
+│ 0       │ '80169d' │ 'IGO51C' │ 'India'         │ 35000    │ 466        │ 116       │ 0         │ '2170' │ 23.255 │ 57.333 │
+│ 1       │ '06a115' │ 'QTR960' │ 'Qatar'         │ 33000    │ 495        │ 116       │ 0         │ '2120' │ 23.196 │ 57.464 │
+│ 2       │ '80044c' │ 'AXB545' │ 'India'         │ 21950    │ 362        │ 308       │ -1728     │ '—'    │ 24.443 │ 57.127 │
+└─────────┴──────────┴──────────┴─────────────────┴──────────┴────────────┴───────────┴───────────┴────────┴────────┴────────┘
 
-Aircraft with a position: 2
-Data time:                06:19:57 UTC (10:19:57 Muscat time)
-API credits remaining:    3990
+Aircraft with a position: 3
+Data time:                06:26:00 UTC (10:26:00 Muscat time)
+API credits remaining:    3998
 ```
 
 How to read it:
 
-- **(index)**: the aircraft's ICAO 24‑bit transponder address (its permanent ID).
+- **ICAO24**: the aircraft's ICAO 24‑bit transponder address (its permanent ID).
 - **Alt (ft)**: barometric altitude in feet. 35,000 ft is "flight level 350".
 - **Speed (kt)**: ground speed in knots (nautical miles per hour).
 - **Track (°)**: direction of travel, clockwise from north (90 = east, 270 = west).
