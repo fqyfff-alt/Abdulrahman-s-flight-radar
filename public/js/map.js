@@ -14,6 +14,7 @@ import {
   TILE_ATTRIBUTION,
   TILE_URL,
 } from './config.js';
+import { getCoveredEdges } from './layout.js';
 
 /**
  * Create the map inside <div id="map"> and return it.
@@ -92,4 +93,26 @@ function setUpLabelToggle(map) {
   }
   map.on('zoomend', updateLabels);
   updateLabels();
+}
+
+/**
+ * Smoothly fly the map so `latLng` ends up in the middle of the part of the
+ * map you can SEE, not hidden behind the side panel or status bar.
+ *
+ * map.flyTo() centres a point in the whole map. To centre it in the visible
+ * part instead, we shift the target by half the difference between the
+ * covered edges. For example, if a 344 px panel covers the left side, the
+ * visible middle is 172 px right of the map's middle.
+ */
+export function flyToVisibleArea(map, latLng, zoom) {
+  const edges = getCoveredEdges();
+  const offset = L.point((edges.left - edges.right) / 2, (edges.top - edges.bottom) / 2);
+
+  // project() turns a lat/lng into pixels at a zoom level; unproject() goes back.
+  const targetPixels = map.project(latLng, zoom).subtract(offset);
+  const target = map.unproject(targetPixels, zoom);
+
+  // If the user has asked their device to reduce motion, jump instead of flying.
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  map.flyTo(target, zoom, { animate: !reduceMotion, duration: 1.2 });
 }

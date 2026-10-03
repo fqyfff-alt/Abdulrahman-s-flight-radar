@@ -71,3 +71,31 @@ export const STALE_POSITION_SECONDS = 60;
 // 30-second refresh, 10 positions is about the last 5 minutes of flight.
 export const TRAIL_LENGTH = 10;
 export const TRAIL_MAX_OPACITY = 0.9; // the newest segment's opacity (1 = solid)
+
+// When you click a plane in the side panel, zoom in to at least this level.
+export const FOCUS_ZOOM = 10;
+
+// ---------------------------------------------------------------------------
+// Muscat International Airport and the "radar scope" around it
+// ---------------------------------------------------------------------------
+
+export const AIRPORT = {
+  icao: 'OOMS', // the code pilots and air traffic control use
+  iata: 'MCT', // the code printed on tickets and luggage tags
+  name: 'Muscat International Airport',
+  position: [23.593, 58.284],
+  // Runway numbers are the runway's compass direction divided by 10. Muscat's
+  // parallel runways are numbered 08 and 26: they point about 080° and 260°.
+  runwayHeading: 80,
+};
+
+// Faint circles around the airport, like the range rings on a radar screen.
+export const RANGE_RINGS_KM = [25, 50, 100];
+
+// "Nearby" for the aircraft count next to the airport marker.
+export const NEARBY_RADIUS_KM = 30;
+
+// Likely arrivals (a rough guess; see airspace.js): planes closer than this,
+// lower than this, and descending.
+export const ARRIVAL_MAX_DISTANCE_KM = 60;
+export const ARRIVAL_MAX_ALTITUDE_FEET = 10_000;

@@ -12,8 +12,8 @@ It's being built in stages so each part can be tested before the next one starts
 | 2 | Backend server with `GET /api/aircraft` (caching, rate‑limit handling) | ✅ done |
 | 3 | Basic map with the dark theme, plane markers, and popups | ✅ done |
 | 4 | Altitude colours, legend, smooth motion, and trails | ✅ done |
-| 5 | Side panel, status bar, airport marker, range rings, arrivals estimate | ⏳ next |
-| 6 | Opening animation that draws the country borders | |
+| 5 | Side panel, status bar, airport marker, range rings, arrivals estimate | ✅ done |
+| 6 | Opening animation that draws the country borders | ⏳ next |
 
 ---
 
@@ -286,13 +286,18 @@ each other, just like the server code.
 | ---- | --- |
 | `public/index.html` | The page: map container, zoom buttons, and `<script>` tags for Leaflet and our code |
 | `public/css/style.css` | The dark theme. All colours are CSS variables at the top |
-| `public/js/main.js` | Starting point: creates the map, refreshes aircraft every 30 s |
+| `public/js/main.js` | Starting point: creates everything, refreshes aircraft every 30 s and passes the data around |
 | `public/js/config.js` | Settings: map centre, zoom levels, tile address, refresh interval |
 | `public/js/map.js` | Creates the Leaflet map, tiles, zoom buttons, label toggle |
 | `public/js/aircraft.js` | Plane markers: icon, rotation, popups, selection, add/update/remove |
 | `public/js/format.js` | Unit conversions (m → ft, m/s → kt, m/s → ft/min), altitude bands, text formatting |
 | `public/js/geo.js` | Position maths: moving a point by distance and bearing, dead reckoning, stale positions |
 | `public/js/trails.js` | The fading trail behind each plane |
+| `public/js/airspace.js` | Distance to Muscat airport, nearby count, likely arrivals and their rough ETA |
+| `public/js/airport.js` | The OOMS airport marker, its label, and the radar range rings |
+| `public/js/panel.js` | The side panel / phone bottom sheet: lists, tap and swipe, row clicks |
+| `public/js/status.js` | The status bar and the "Scanning airspace…" message |
+| `public/js/layout.js` | Works out which parts of the map the panels cover, so popups and fly‑to avoid them |
 | `public/js/api.js` | Talks to our server (`/api/config`, `/api/aircraft`) |
 
 ---
@@ -357,6 +362,60 @@ position. The app:
 
 You can change both limits in `public/js/config.js` (`MAX_PREDICTION_SECONDS` and
 `STALE_POSITION_SECONDS`).
+
+---
+
+## Stage 5: side panel, status bar, airport, and arrivals
+
+```bash
+npm start
+```
+
+Open <http://localhost:3000>. What's new:
+
+| Part | What you should see |
+| ---- | ------------------- |
+| **Status bar** (top) | "Muscat Airspace" with a pulsing green dot, plus the number of aircraft, the time of the data (hover for UTC) and your remaining credits. The dot turns **amber** with a short message if OpenSky rate‑limits you, and **red** with "Connection lost" if the server stops answering. |
+| **Side panel** (left) | Every aircraft, highest first: callsign, altitude, speed, and a dot in its altitude colour. Click a row and the map flies to that plane and opens its popup. Click a plane on the map and its row is highlighted with a teal border. Click the panel header to fold it away. |
+| **Likely arrivals** | At the top of the panel, when there are any: planes that are probably about to land at Muscat, with a rough time and distance to the airport. Their popups say so too. |
+| **Airport** | A teal airport symbol at OOMS (its two runways point the real way, 080°/260°), labelled with how many aircraft are within 30 km. Click it for a summary. |
+| **Range rings** | Faint circles at 25, 50 and 100 km around the airport, like a radar screen. |
+| **Loading** | "Scanning airspace…" with a spinning radar sweep until the first data arrives. |
+
+**On a phone** (or in the browser's phone view, F12 then Ctrl + Shift + M), the panel is
+a **bottom sheet**: tap its header or swipe it up to open the list, swipe down or tap again
+to close it. Tapping a plane in the list closes the sheet and flies to the plane.
+
+### How "likely arrivals" works (and why it's only a guess)
+
+OpenSky's live positions don't say where a flight is going, so the app guesses. A plane
+counts as a likely arrival if it is:
+
+1. within **60 km** of Muscat airport,
+2. below **10,000 ft**, and
+3. **descending**.
+
+The time shown is `distance ÷ ground speed`, as if the plane flew straight to the airport
+at its current speed. Real arrivals follow set approach routes that line them up with the
+runway, slow down as they get closer, and sometimes circle in holding patterns, so the
+real time is usually **longer**. The comments in `public/js/airspace.js` go through the
+cases where the guess can be wrong.
+
+**Why you may rarely see arrivals:** ADS‑B radio signals travel in straight lines, so a
+ground receiver can't hear a low plane that is below its horizon, behind the curve of
+the Earth. OpenSky has few receivers near Muscat, so low, landing aircraft are the
+hardest for it to hear. High cruising airliners are much easier to pick up.
+
+### Distances: the haversine formula
+
+The distance from each plane to the airport is measured along the Earth's curved surface
+with the **haversine formula** (`distanceBetween()` in `public/js/geo.js`):
+
+```text
+a        = sin²(Δlat / 2) + cos(lat1) × cos(lat2) × sin²(Δlon / 2)
+angle    = 2 × atan2(√a, √(1 − a))      ← the angle between the two points, seen from the Earth's centre
+distance = Earth's radius × angle       ← arc length = radius × angle (in radians)
+```
 
 ---
 

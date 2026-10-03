@@ -70,6 +70,36 @@ export function movePoint(latitude, longitude, distanceMetres, bearingDegrees) {
 }
 
 /**
+ * The distance in metres between two [latitude, longitude] points, measured
+ * along the Earth's curved surface (the "great-circle" distance, the shortest
+ * path on a sphere), using the HAVERSINE formula.
+ *
+ * The idea: picture lines from the centre of the Earth out to each point. The
+ * distance along the surface is the radius × the angle between those lines
+ * (in radians), just like the arc length of a circle: arc = r × angle.
+ * The haversine formula is a numerically reliable way to get that angle:
+ *
+ *   a = sin²(Δlat / 2) + cos(lat1) × cos(lat2) × sin²(Δlon / 2)
+ *   angle = 2 × atan2(√a, √(1 − a))
+ *   distance = Earth's radius × angle
+ *
+ * (Δ, "delta", means "the difference in". Navigators have used this formula
+ * since the 1800s, when sailors worked it out with printed tables.)
+ */
+export function distanceBetween([latitude1, longitude1], [latitude2, longitude2]) {
+  const lat1 = degreesToRadians(latitude1);
+  const lat2 = degreesToRadians(latitude2);
+  const deltaLat = degreesToRadians(latitude2 - latitude1);
+  const deltaLon = degreesToRadians(longitude2 - longitude1);
+
+  const a =
+    Math.sin(deltaLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(deltaLon / 2) ** 2;
+  const angle = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+  return EARTH_RADIUS_METRES * angle;
+}
+
+/**
  * How many seconds ago the plane's position was measured, or null if unknown.
  * Uses your computer's clock, which is normally kept within a second of the
  * real time automatically.

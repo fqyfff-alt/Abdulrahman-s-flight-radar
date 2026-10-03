@@ -139,6 +139,29 @@ export function describeVerticalRate(metresPerSecond) {
   return { trend: 'descend', label: 'descending', arrow: '▼', text: `${formatNumber(feetPerMinute)} fpm` };
 }
 
+/** The name we show for a plane: its callsign, or its ICAO address if it has none. */
+export function displayName(plane) {
+  return plane.callsign ?? plane.icao24.toUpperCase();
+}
+
+/** A distance for display: 4.24 → "4.2 km", 37.6 → "38 km". */
+export function formatDistanceKm(kilometres) {
+  return kilometres < 10 ? `${kilometres.toFixed(1)} km` : `${Math.round(kilometres)} km`;
+}
+
+/** A rough time for display: 0.4 → "<1 min", 6.2 → "~6 min", null → "—". */
+export function formatMinutes(minutes) {
+  if (minutes === null) {
+    return '—';
+  }
+  return minutes < 1 ? '<1 min' : `~${Math.round(minutes)} min`;
+}
+
+/** A Unix time (seconds) as a local clock time, e.g. "10:26:00". */
+export function formatClockTime(unixSeconds) {
+  return new Date(unixSeconds * 1000).toLocaleTimeString('en-GB');
+}
+
 /** A duration for display: 45 → "45 s", 250 → "4 min". */
 export function formatAge(seconds) {
   if (seconds < 60) {

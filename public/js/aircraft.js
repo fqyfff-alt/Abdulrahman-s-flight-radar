@@ -9,16 +9,23 @@
  * plane along its track once per second.
  */
 
+import { getArrivalEstimate } from './airspace.js';
+import { AIRPORT, FOCUS_ZOOM } from './config.js';
 import {
   describeVerticalRate,
+  displayName,
   escapeHtml,
   formatAge,
   formatAltitude,
+  formatDistanceKm,
   formatHeading,
+  formatMinutes,
   formatSpeed,
   getAltitudeBand,
 } from './format.js';
 import { isPositionStale, predictPosition, secondsSincePositionReport } from './geo.js';
+import { popupPaddingBottomRight, popupPaddingTopLeft } from './layout.js';
+import { flyToVisibleArea } from './map.js';
 import {
   addTrailPoint,
   createTrail,
@@ -110,9 +117,14 @@ function buildStaleNoteHtml(plane) {
   return `<p class="popup-note">No position update for ${age}, so this position is an estimate.</p>`;
 }
 
-/** The name we show for a plane: its callsign, or its ICAO address if it has none. */
-function displayName(plane) {
-  return plane.callsign ?? plane.icao24.toUpperCase();
+/** For likely arrivals: a line with the rough distance and time to Muscat. */
+function buildArrivalNoteHtml(plane) {
+  const estimate = getArrivalEstimate(plane);
+  if (!estimate) {
+    return '';
+  }
+  return `<p class="popup-note">Probably landing at ${AIRPORT.icao}: ${formatDistanceKm(estimate.distanceKm)} away,
+    ${formatMinutes(estimate.minutes)} (rough estimate)</p>`;
 }
 
 /**
@@ -146,6 +158,7 @@ function buildPopupHtml(plane) {
       <dt>Squawk</dt>
       <dd>${formatSquawkHtml(plane.squawk)}</dd>
     </dl>
+    ${buildArrivalNoteHtml(plane)}
     ${buildStaleNoteHtml(plane)}`;
   // Note: "Heading" here is really the TRACK (direction over the ground), which
   // is what OpenSky provides. See the trueTrack comment in lib/opensky.js.
@@ -167,12 +180,20 @@ let selectedIcao = null;
 // The Leaflet map, saved by initAircraft().
 let map = null;
 
+// Called whenever the selected plane changes; set by initAircraft().
+let onSelectionChange = () => {};
+
 // Every possible altitude class, so we can remove the old one before adding the new.
 const ALTITUDE_BAND_CLASSES = ['alt-ground', 'alt-low', 'alt-mid', 'alt-high', 'alt-unknown'];
 
-/** Call once at startup, after the map exists. */
-export function initAircraft(leafletMap) {
+/**
+ * Call once at startup, after the map exists.
+ * `onSelectionChange(icao24 or null)` is called when a popup opens or closes,
+ * so the side panel can highlight the same plane.
+ */
+export function initAircraft(leafletMap, options = {}) {
   map = leafletMap;
+  onSelectionChange = options.onSelectionChange ?? onSelectionChange;
   initTrails(map);
 }
 
@@ -203,6 +224,7 @@ function updateMarkerDetails(entry) {
 /** Mark one plane as selected (bigger, glowing ring) and draw it above the others. */
 function setSelected(icao24, isSelected) {
   selectedIcao = isSelected ? icao24 : null;
+  onSelectionChange(selectedIcao);
   const entry = aircraftByIcao.get(icao24);
   // When a plane leaves the area with its popup open, Leaflet removes the
   // marker's element first and closes the popup afterwards, so the element
@@ -226,7 +248,13 @@ function addAircraft(plane) {
     riseOnHover: true, // hovered plane is drawn on top of its neighbours
   });
 
-  marker.bindPopup('', { maxWidth: 280, minWidth: 210, autoPanPadding: [40, 40] });
+  marker.bindPopup('', {
+    maxWidth: 280,
+    minWidth: 210,
+    // Keep popups clear of the status bar and side panel (see layout.js).
+    autoPanPaddingTopLeft: popupPaddingTopLeft,
+    autoPanPaddingBottomRight: popupPaddingBottomRight,
+  });
 
   // Opening a popup selects the plane; closing it deselects it.
   marker.on('popupopen', () => setSelected(plane.icao24, true));
@@ -265,6 +293,21 @@ function updateExistingAircraft(entry, plane) {
   entry.marker.setLatLng(currentPosition); // the "correction" after predicting
   updateMarkerDetails(entry);
   drawTrail(entry.trail, currentPosition);
+}
+
+/**
+ * Fly the map to a plane and open its popup. Used when you click a plane in
+ * the side panel.
+ */
+export function focusAircraft(icao24) {
+  const entry = aircraftByIcao.get(icao24);
+  if (!entry) {
+    return;
+  }
+  map.closePopup();
+  // Open the popup once the map has finished moving ("once" = run one time only).
+  map.once('moveend', () => entry.marker.openPopup());
+  flyToVisibleArea(map, entry.marker.getLatLng(), Math.max(map.getZoom(), FOCUS_ZOOM));
 }
 
 /**

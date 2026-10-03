@@ -32,6 +32,9 @@
   --color-climb: #22c55e;
   --color-descend: #f59e0b;
 
+  /* The "live" dot in the status bar */
+  --color-live: #22c55e;
+
   /* A plane's colour. The .alt-* classes below change it per plane; planes
      with an unknown altitude keep this default. */
   --color-plane: var(--color-text);
@@ -42,6 +45,12 @@
 
   /* Motion */
   --transition-fast: 200ms ease;
+
+  /* Layout sizes */
+  --status-bar-height: 52px;
+  --panel-width: 320px;
+  --gap: 12px; /* space between panels and the screen edge */
+  --sheet-peek: 68px; /* phones: how much of the closed bottom sheet shows */
 }
 
 /* --------------------------------------------------------------------------
@@ -73,6 +82,12 @@ body {
 #map {
   position: fixed;
   inset: 0;
+}
+
+/* The "hidden" attribute normally hides an element, but a CSS rule like
+   display: flex would override it. This rule makes "hidden" always win. */
+[hidden] {
+  display: none !important;
 }
 
 /* Text only screen readers can "see" (it's visually hidden but still read aloud) */
@@ -117,8 +132,8 @@ body {
 
 .zoom-controls {
   position: fixed;
-  top: 16px;
-  right: 16px;
+  top: calc(var(--status-bar-height) + var(--gap));
+  right: var(--gap);
   z-index: 1000; /* above the map (Leaflet's layers use z-index up to ~800) */
   display: flex;
   flex-direction: column;
@@ -326,12 +341,494 @@ body {
   background: var(--color-plane);
 }
 
+/* Short labels are for the compact phone legend */
+.label-short {
+  display: none;
+}
+
 .legend-note {
   margin: 8px 0 0;
   padding-top: 6px;
   border-top: 1px solid var(--color-border);
   color: var(--color-text-secondary);
   font-size: 11px;
+}
+
+/* --------------------------------------------------------------------------
+   Status bar (top of the screen)
+   -------------------------------------------------------------------------- */
+
+.status-bar {
+  /* The colour of the dot and message. Changed by data-state below. */
+  --status-colour: var(--color-text-secondary);
+
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1100;
+  height: var(--status-bar-height);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 16px;
+  background: rgba(18, 24, 33, 0.9);
+  border-bottom: 1px solid var(--color-border);
+  backdrop-filter: blur(8px);
+}
+
+/* status.js sets data-state; these rules pick the colour for each state */
+.status-bar[data-state='live'] {
+  --status-colour: var(--color-live);
+}
+
+.status-bar[data-state='limited'] {
+  --status-colour: var(--color-warning);
+}
+
+.status-bar[data-state='error'] {
+  --status-colour: var(--color-error);
+}
+
+.status-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0; /* allows the message to shrink with "…" instead of overflowing */
+}
+
+.status-title h1 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.live-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--status-colour);
+  transition: background var(--transition-fast);
+}
+
+/* Only the green "live" dot pulses: a ring that grows and fades every 2 s */
+.status-bar[data-state='live'] .live-dot {
+  animation: live-pulse 2s ease-out infinite;
+}
+
+@keyframes live-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.55);
+  }
+  70%,
+  100% {
+    box-shadow: 0 0 0 7px rgba(34, 197, 94, 0);
+  }
+}
+
+.status-message {
+  overflow: hidden;
+  color: var(--status-colour);
+  font-size: 12px;
+  white-space: nowrap;
+  text-overflow: ellipsis; /* "Rate limited · ret…" if there isn't room */
+}
+
+.status-stats {
+  display: flex;
+  gap: 18px;
+  margin: 0;
+}
+
+/* Each stat: a tiny label above its value, like an instrument readout */
+.status-stats .stat {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.status-stats dt {
+  color: var(--color-text-secondary);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.status-stats dd {
+  margin: 0;
+  font: 500 13px/1.25 var(--font-mono);
+}
+
+/* --------------------------------------------------------------------------
+   Side panel (left side on laptops; a bottom sheet on phones, see the end)
+   -------------------------------------------------------------------------- */
+
+.side-panel {
+  position: fixed;
+  top: calc(var(--status-bar-height) + var(--gap));
+  left: var(--gap);
+  bottom: var(--gap);
+  z-index: 1050;
+  width: var(--panel-width);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: rgba(18, 24, 33, 0.82); /* --color-panel, slightly see-through */
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  backdrop-filter: blur(12px); /* blurs the map behind the panel */
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+/* Laptop, closed: only the header shows */
+.side-panel:not(.is-expanded) {
+  bottom: auto;
+}
+
+.side-panel:not(.is-expanded) .panel-body {
+  display: none;
+}
+
+/* The header is a <button>, so we reset the browser's button styling */
+.panel-header {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 14px 16px;
+  border: 0;
+  border-bottom: 1px solid var(--color-border);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.panel-header:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -2px;
+}
+
+.panel-heading {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.panel-title {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.panel-count {
+  color: var(--color-accent);
+  font: 500 13px var(--font-mono);
+}
+
+.panel-summary {
+  overflow: hidden;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.panel-chevron {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: var(--color-text-secondary);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform var(--transition-fast);
+}
+
+/* Laptop: the arrow points up when open ("collapse") and down when closed */
+.side-panel:not(.is-expanded) .panel-chevron {
+  transform: rotate(180deg);
+}
+
+.sheet-grabber {
+  display: none; /* the little handle bar is only shown on phones */
+}
+
+/* The scrolling list area */
+.panel-body {
+  flex: 1;
+  min-height: 0; /* lets the body shrink so it can scroll */
+  padding: 6px 0 12px;
+  overflow-y: auto;
+  overscroll-behavior: contain; /* scrolling the list doesn't scroll the page */
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border) transparent;
+}
+
+.panel-section + .panel-section {
+  margin-top: 6px;
+}
+
+.section-title {
+  display: flex;
+  align-items: center;
+  margin: 10px 16px 6px;
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* Small amber label for the arrivals section */
+.arrivals-badge {
+  padding: 2px 8px;
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  border-radius: 999px;
+  background: rgba(245, 158, 11, 0.12);
+  color: var(--color-warning);
+  font-size: 10px;
+}
+
+.section-note {
+  margin: 0 16px 6px;
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.aircraft-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* One plane in the list. It's a <button> so it works with the keyboard. */
+.aircraft-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 16px 8px 14px;
+  border: 0;
+  border-left: 2px solid transparent; /* turns teal when selected */
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast);
+}
+
+.aircraft-row:hover {
+  background: var(--color-panel-hover);
+}
+
+.aircraft-row.is-selected {
+  border-left-color: var(--color-accent);
+  background: rgba(45, 212, 191, 0.08);
+}
+
+.aircraft-row:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -2px;
+}
+
+/* The coloured dot gets --color-plane from the row's .alt-* class */
+.row-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-plane);
+}
+
+.aircraft-row.is-stale .row-dot {
+  opacity: 0.45;
+}
+
+.row-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.row-callsign {
+  font: 700 14px/1.2 var(--font-mono);
+  letter-spacing: 0.02em;
+}
+
+.row-details {
+  color: var(--color-text-secondary);
+  font: 400 12px/1.3 var(--font-mono);
+}
+
+.row-eta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  font-family: var(--font-mono);
+}
+
+.row-eta-time {
+  color: var(--color-warning);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.row-eta-distance {
+  color: var(--color-text-secondary);
+  font-size: 11px;
+}
+
+.panel-empty {
+  margin: 12px 16px;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+}
+
+/* --------------------------------------------------------------------------
+   Muscat airport marker and range rings
+   -------------------------------------------------------------------------- */
+
+.airport-marker {
+  background: none;
+  border: none;
+}
+
+.airport-marker svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.airport-marker circle {
+  fill: rgba(45, 212, 191, 0.12);
+  stroke: var(--color-accent);
+  stroke-width: 1.5;
+}
+
+.airport-marker line {
+  stroke: var(--color-accent);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.airport-marker:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 3px;
+  border-radius: 50%;
+}
+
+/* "OOMS / 3 within 30 km" under the airport symbol */
+.airport-label {
+  position: absolute;
+  top: calc(100% + 3px);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(11, 15, 20, 0.75);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.airport-code {
+  color: var(--color-accent);
+  font: 700 11px/1.3 var(--font-mono);
+  letter-spacing: 0.06em;
+}
+
+.airport-count {
+  color: var(--color-text-secondary);
+  font: 400 10px/1.3 var(--font-mono);
+}
+
+/* The rings themselves (SVG circles drawn by Leaflet) */
+.range-ring {
+  stroke: var(--color-text-secondary);
+  stroke-opacity: 0.28;
+}
+
+/* Distance labels sitting on the rings */
+.range-label {
+  background: none;
+  border: none;
+  text-align: center;
+}
+
+.range-label span {
+  display: inline-block;
+  padding: 0 4px;
+  border-radius: 3px;
+  background: rgba(11, 15, 20, 0.8); /* hides the ring line behind the text */
+  color: var(--color-text-secondary);
+  font: 400 10px/14px var(--font-mono);
+}
+
+/* --------------------------------------------------------------------------
+   "Scanning airspace…" (until the first data arrives)
+   -------------------------------------------------------------------------- */
+
+.scanning {
+  position: fixed;
+  top: 50%;
+  /* the middle of the map area to the right of the side panel */
+  left: calc(50% + (var(--panel-width) + var(--gap)) / 2);
+  z-index: 1000;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 18px 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: rgba(18, 24, 33, 0.88);
+  backdrop-filter: blur(8px);
+  font-size: 13px;
+  pointer-events: none;
+}
+
+/* A tiny radar screen: a ring, and a sweep (a fading wedge) that rotates */
+.radar-sweep {
+  position: relative;
+  width: 28px;
+  height: 28px;
+  overflow: hidden;
+  border: 1px solid rgba(45, 212, 191, 0.5);
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--color-accent) 0 1.5px, transparent 2px);
+}
+
+.radar-sweep::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  /* a "conic" gradient fades around the circle, like a radar beam's afterglow */
+  background: conic-gradient(rgba(45, 212, 191, 0.75), rgba(45, 212, 191, 0) 30%);
+  animation: radar-spin 1.6s linear infinite;
+}
+
+@keyframes radar-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* --------------------------------------------------------------------------
@@ -431,6 +928,138 @@ body {
 }
 
 /* --------------------------------------------------------------------------
+   Phones (720 px wide or less): the side panel becomes a bottom sheet
+   -------------------------------------------------------------------------- */
+
+@media (max-width: 720px) {
+  .status-bar {
+    padding: 0 12px;
+  }
+
+  .status-title h1 {
+    font-size: 14px;
+  }
+
+  /* Not enough room for both: show the warning message instead of the title */
+  .status-bar.has-message .status-title h1 {
+    display: none;
+  }
+
+  .status-stats {
+    gap: 12px;
+  }
+
+  /* The sheet is always full height; when closed it's pushed down so only
+     its header (--sheet-peek pixels) shows. translateY moves it smoothly. */
+  .side-panel,
+  .side-panel:not(.is-expanded) {
+    top: auto;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: auto;
+    height: 70vh;
+    height: 70dvh; /* "dynamic" height that allows for the phone's address bar */
+    border-width: 1px 0 0;
+    border-radius: 16px 16px 0 0;
+    transform: translateY(calc(100% - var(--sheet-peek)));
+    transition: transform 250ms ease;
+  }
+
+  .side-panel.is-expanded {
+    transform: translateY(0);
+  }
+
+  /* While closed, hide the list from the keyboard and screen readers too. The
+     delay waits for the closing slide to finish before hiding it. */
+  .side-panel:not(.is-expanded) .panel-body {
+    display: block;
+    visibility: hidden;
+    transition: visibility 0s 250ms;
+  }
+
+  .panel-header {
+    flex: none;
+    height: var(--sheet-peek);
+    padding-top: 18px;
+    touch-action: none; /* we handle swipes ourselves (see panel.js) */
+  }
+
+  .sheet-grabber {
+    display: block;
+    position: absolute;
+    top: 7px;
+    left: 50%;
+    width: 36px;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--color-border);
+    transform: translateX(-50%);
+  }
+
+  /* On phones the arrow points up when closed ("pull up") and down when open */
+  .side-panel:not(.is-expanded) .panel-chevron {
+    transform: none;
+  }
+
+  .side-panel.is-expanded .panel-chevron {
+    transform: rotate(180deg);
+  }
+
+  /* The legend becomes one compact line at the top-left, under the status bar */
+  .legend {
+    top: calc(var(--status-bar-height) + 10px);
+    left: 10px;
+    right: auto;
+    bottom: auto;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 10px;
+    border-radius: 999px;
+  }
+
+  .legend-title {
+    margin: 0;
+    font-size: 9px;
+  }
+
+  .legend-list {
+    display: flex;
+    gap: 8px;
+    font-size: 10px;
+  }
+
+  .legend-list li {
+    gap: 4px;
+  }
+
+  .legend-note,
+  .label-long {
+    display: none;
+  }
+
+  .label-short {
+    display: inline;
+  }
+
+  .zoom-controls {
+    top: calc(var(--status-bar-height) + 10px);
+    right: 10px;
+  }
+
+  /* Keep the map credits visible above the closed bottom sheet */
+  .leaflet-bottom {
+    bottom: var(--sheet-peek);
+  }
+
+  .scanning {
+    top: 45%;
+    left: 50%;
+  }
+}
+
+/* --------------------------------------------------------------------------
    Accessibility: respect the "reduce motion" setting
    -------------------------------------------------------------------------- */
 
@@ -440,5 +1069,6 @@ body {
   *::after {
     transition-duration: 0.01ms !important;
     animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important; /* stop repeating animations (pulse, radar sweep) */
   }
 }

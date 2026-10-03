@@ -33,7 +33,54 @@
   </head>
 
   <body>
+    <!-- Status bar. status.js changes data-state (loading / live / limited /
+         error) and style.css colours the dot to match. -->
+    <header class="status-bar" id="status-bar" data-state="loading">
+      <div class="status-title">
+        <span class="live-dot" aria-hidden="true"></span>
+        <h1>Muscat Airspace</h1>
+        <!-- role="status" makes screen readers announce changes to this text -->
+        <span class="status-message" id="status-message" role="status"></span>
+      </div>
+      <!-- A <dl> (description list) holds label/value pairs: <dt> label, <dd> value -->
+      <dl class="status-stats">
+        <div class="stat"><dt>Aircraft</dt><dd id="stat-aircraft">–</dd></div>
+        <div class="stat"><dt>Updated</dt><dd id="stat-updated">–</dd></div>
+        <div class="stat"><dt>Credits</dt><dd id="stat-credits">–</dd></div>
+      </dl>
+    </header>
+
     <div id="map" role="region" aria-label="Map of aircraft over Muscat"></div>
+
+    <!-- Side panel (a bottom sheet on phones). panel.js fills in the lists. -->
+    <aside class="side-panel" id="side-panel" aria-label="Aircraft list">
+      <!-- The header is also the open/close button (tap it, or swipe on phones) -->
+      <button type="button" class="panel-header" id="panel-toggle" aria-expanded="true" aria-controls="panel-body">
+        <span class="sheet-grabber" aria-hidden="true"></span>
+        <span class="panel-heading">
+          <span class="panel-title">Aircraft <span class="panel-count" id="panel-count">–</span></span>
+          <span class="panel-summary" id="panel-summary">Scanning airspace…</span>
+        </span>
+        <svg class="panel-chevron" viewBox="0 0 16 16" aria-hidden="true">
+          <path d="M4 10 L8 6 L12 10" />
+        </svg>
+      </button>
+
+      <div class="panel-body" id="panel-body">
+        <!-- "hidden" until there's at least one likely arrival -->
+        <section class="panel-section" id="arrivals-section" aria-labelledby="arrivals-title" hidden>
+          <h2 class="section-title" id="arrivals-title"><span class="arrivals-badge">Likely arrivals</span></h2>
+          <p class="section-note" id="arrivals-note"></p>
+          <ul class="aircraft-list" id="arrivals-list"></ul>
+        </section>
+
+        <section class="panel-section" aria-labelledby="all-title">
+          <h2 class="section-title" id="all-title">All aircraft · highest first</h2>
+          <ul class="aircraft-list" id="aircraft-list"></ul>
+          <p class="panel-empty" id="panel-empty" hidden>No aircraft in range right now.</p>
+        </section>
+      </div>
+    </aside>
 
     <!-- Our own zoom buttons (Leaflet's default ones are hidden). Real <button>s
          work with the keyboard automatically (Tab, then Enter or Space). -->
@@ -44,16 +91,24 @@
 
     <!-- Altitude colour key. Each dot gets its colour from the same .alt-*
          classes the planes use, so the key always matches the map. -->
-    <aside class="legend" aria-label="Altitude colour key">
-      <h2 class="legend-title">Altitude</h2>
+    <!-- Each label has a long version (laptops) and a short one (phones, where
+         the key is a single compact line); style.css shows one or the other. -->
+    <aside class="legend" id="legend" aria-label="Altitude colour key">
+      <h2 class="legend-title"><span class="label-long">Altitude</span><span class="label-short">Alt</span></h2>
       <ul class="legend-list">
-        <li class="alt-high"><span class="legend-dot"></span>Above 25,000 ft</li>
-        <li class="alt-mid"><span class="legend-dot"></span>10,000–25,000 ft</li>
-        <li class="alt-low"><span class="legend-dot"></span>Below 10,000 ft</li>
-        <li class="alt-ground"><span class="legend-dot"></span>On ground</li>
+        <li class="alt-high"><span class="legend-dot"></span><span class="label-long">Above 25,000 ft</span><span class="label-short">25k+</span></li>
+        <li class="alt-mid"><span class="legend-dot"></span><span class="label-long">10,000–25,000 ft</span><span class="label-short">10–25k</span></li>
+        <li class="alt-low"><span class="legend-dot"></span><span class="label-long">Below 10,000 ft</span><span class="label-short">&lt;10k</span></li>
+        <li class="alt-ground"><span class="legend-dot"></span><span class="label-long">On ground</span><span class="label-short">Gnd</span></li>
       </ul>
       <p class="legend-note">Faded: no position for 1+ min</p>
     </aside>
+
+    <!-- Shown until the first aircraft data arrives (status.js hides it) -->
+    <div class="scanning" id="scanning" role="status">
+      <span class="radar-sweep" aria-hidden="true"></span>
+      Scanning airspace…
+    </div>
 
     <script
       src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
