@@ -167,6 +167,15 @@ app.get('/api/aircraft', async (request, response) => {
   }
 });
 
+// Settings the web page needs at startup. Right now that's just the CARTO
+// map-tile key. Unlike the OpenSky secret, this key is NOT really secret:
+// browsers have to put it in every tile address, so anyone can see it. We
+// still keep it in .env so it isn't uploaded to GitHub, and you can lock it to
+// your own websites in CARTO's dashboard so nobody else can use up your quota.
+app.get('/api/config', (request, response) => {
+  response.json({ cartoApiKey: process.env.CARTO_API_KEY || null });
+});
+
 // Any other /api/... address doesn't exist: answer with a JSON 404 error
 // (instead of Express's default HTML page, which is awkward for code to read).
 app.use('/api', (request, response) => {
@@ -196,6 +205,9 @@ app.listen(PORT, (error) => {
   console.log(`   Aircraft API:  http://localhost:${PORT}/api/aircraft`);
   console.log(
     `   OpenSky mode:  ${hasCredentials() ? 'authenticated (4,000 credits/day)' : 'anonymous (400 credits/day)'}`,
+  );
+  console.log(
+    `   Map tiles:     ${process.env.CARTO_API_KEY ? 'CARTO key set' : '⚠️  no CARTO_API_KEY in .env, so tiles will show an "API key required" watermark (free key: see README)'}`,
   );
   console.log('   Press Ctrl+C to stop.\n');
 });

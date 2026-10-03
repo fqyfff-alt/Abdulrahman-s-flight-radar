@@ -10,8 +10,8 @@ It's being built in stages so each part can be tested before the next one starts
 | ----- | ------------ | ------ |
 | 1 | Test script that fetches the data once and prints a table in the terminal | ✅ done |
 | 2 | Backend server with `GET /api/aircraft` (caching, rate‑limit handling) | ✅ done |
-| 3 | Basic map with the dark theme, plane markers, and popups | ⏳ next |
-| 4 | Altitude colours, legend, smooth motion, and trails | |
+| 3 | Basic map with the dark theme, plane markers, and popups | ✅ done |
+| 4 | Altitude colours, legend, smooth motion, and trails | ⏳ next |
 | 5 | Side panel, status bar, airport marker, range rings, arrivals estimate | |
 | 6 | Opening animation that draws the country borders | |
 
@@ -22,6 +22,7 @@ It's being built in stages so each part can be tested before the next one starts
 - **Node.js 18 or newer** (the current LTS version is recommended). Check with `node --version`.
   Download it from <https://nodejs.org/>.
 - **An OpenSky account** (free). Optional, but strongly recommended; see below.
+- **A CARTO basemaps key** (free) for the dark map tiles; see below.
 
 ---
 
@@ -43,7 +44,25 @@ run your own ADS‑B receiver and feed data to OpenSky).
 > token to each API request. The code in `lib/opensky.js` caches the token and fetches
 > a new one shortly before it expires.
 
-## 2. Create your `.env` file
+## 2. Get a free CARTO map key
+
+The dark map background ("Dark Matter") comes from [CARTO](https://carto.com/basemaps).
+Since September 2026, CARTO requires a free API key from everyone. Without one, the map
+still works, but every tile shows an **"API key required"** watermark.
+
+1. Go to <https://carto.com/basemaps/apikey>.
+2. Enter your e‑mail address. CARTO e‑mails you a sign‑in link (no password needed).
+3. From the dashboard, copy your key.
+
+Personal, research and teaching projects are free up to 5 million tile requests a month,
+far more than this app will ever use.
+
+> **Is it OK that this key is visible in the browser?** Yes. Unlike your OpenSky secret,
+> a map‑tile key *has* to be in the browser, because it's part of every tile address.
+> We still keep it in `.env` so it isn't uploaded to GitHub. To stop anyone else from
+> using up your quota, you can restrict the key to your own websites in CARTO's dashboard.
+
+## 3. Create your `.env` file
 
 The `.env` file holds your secrets. It's listed in `.gitignore`, so git will never
 upload it to GitHub.
@@ -61,11 +80,15 @@ Open `.env` in your editor and paste in your values (no quotes or spaces needed)
 ```ini
 OPENSKY_CLIENT_ID=your-client-id-here
 OPENSKY_CLIENT_SECRET=your-client-secret-here
+CARTO_API_KEY=your-carto-key-here
 ```
 
-If you leave them empty, the app still works in anonymous mode and prints a warning.
+If you leave the OpenSky values empty, the app still works in anonymous mode and prints
+a warning. If you leave the CARTO key empty, the map tiles are watermarked.
 
-## 3. Install dependencies
+**Restart the server after every change to `.env`**: it's only read at startup.
+
+## 4. Install dependencies
 
 From the project folder:
 
@@ -202,6 +225,9 @@ Refresh the JSON page a few times. In the terminal you'll see the cache at work:
 If OpenSky can't be reached at all, the API answers with HTTP **502** and
 `{ "error": "…a plain-language explanation…" }`.
 
+There is also `GET /api/config`, which gives the web page the CARTO map key from `.env`:
+`{ "cartoApiKey": "…" }` (or `null` if it isn't set).
+
 ### How the server saves credits
 
 1. **20‑second cache.** The server remembers OpenSky's last answer. Any request
@@ -213,6 +239,59 @@ If OpenSky can't be reached at all, the API answers with HTTP **502** and
 3. **Backing off when rate limited.** After a 429, the server stops contacting
    OpenSky until the wait time OpenSky gave has passed, and keeps serving the last
    data it had with `"rateLimited": true`.
+
+---
+
+## Stage 3: the map
+
+```bash
+npm start
+```
+
+Open <http://localhost:3000>. You should see:
+
+- A dark map of the Muscat area (the Gulf of Oman on the right).
+- A white plane icon for each aircraft, **pointing in its direction of travel**.
+- Our own **+ / −** zoom buttons in the top‑right corner.
+
+Things to try:
+
+| Do this | What should happen |
+| ------- | ------------------ |
+| Click a plane | A dark popup opens: callsign, country, altitude (ft), ground speed (kt), vertical rate (▲ climbing / ▼ descending / — level), heading, squawk. The plane grows and gets a glowing teal ring. |
+| Press **Esc**, or click the empty map | The popup closes and the ring disappears. |
+| Zoom in to level 9 (one click on **+**) | Callsign labels appear next to the planes. Zoom out and they hide. |
+| Press **Tab** a few times, then **Enter** | The zoom buttons and planes can be reached with the keyboard; Enter opens a plane's popup. |
+| Wait 30 seconds | Planes jump to their new positions. (Stage 4 makes the movement smooth.) |
+| Press **F12**, open **Console** | A line appears every 30 s, e.g. `[10:26:00] 5 aircraft (fresh from OpenSky), 3990 credits left`. |
+| Switch to another browser tab for a while | Refreshing pauses (saving credits), and restarts the moment you come back. |
+
+**See it as a phone would:**
+
+- **In your browser:** press F12, then **Ctrl + Shift + M** (Mac: Cmd + Shift + M) to
+  switch on the device toolbar, and pick a phone such as "iPhone 14".
+- **On your real phone:** connect it to the same Wi‑Fi as your computer. Find your
+  computer's address with `ipconfig` (Windows; look for *IPv4 Address*) or
+  `ipconfig getifaddr en0` (Mac). Then open `http://THAT-ADDRESS:3000` on the phone,
+  e.g. `http://192.168.1.23:3000`. If Windows asks whether to allow Node.js through the
+  firewall, allow it on **private** networks.
+
+### How the frontend is organised
+
+The browser loads plain JavaScript files directly: no frameworks and no build step.
+`index.html` loads them with `<script type="module">`, which lets them `import` from
+each other, just like the server code.
+
+| File | Job |
+| ---- | --- |
+| `public/index.html` | The page: map container, zoom buttons, and `<script>` tags for Leaflet and our code |
+| `public/css/style.css` | The dark theme. All colours are CSS variables at the top |
+| `public/js/main.js` | Starting point: creates the map, refreshes aircraft every 30 s |
+| `public/js/config.js` | Settings: map centre, zoom levels, tile address, refresh interval |
+| `public/js/map.js` | Creates the Leaflet map, tiles, zoom buttons, label toggle |
+| `public/js/aircraft.js` | Plane markers: icon, rotation, popups, selection, add/update/remove |
+| `public/js/format.js` | Unit conversions (m → ft, m/s → kt, m/s → ft/min) and text formatting |
+| `public/js/api.js` | Talks to our server (`/api/config`, `/api/aircraft`) |
 
 ---
 
@@ -243,10 +322,13 @@ The server caches responses so that extra browser tabs don't cost extra credits.
 │   ├── env-check.js      # Explains why credentials weren't found (missing .env, wrong name, …)
 │   └── opensky.js        # Talks to OpenSky: login token, fetching, array → object conversion
 ├── public/
-│   └── index.html        # The web page (a placeholder until Stage 3)
+│   ├── index.html        # The web page
+│   ├── css/
+│   │   └── style.css     # Dark theme (colours as CSS variables)
+│   └── js/               # Frontend code, one job per file (see Stage 3)
 ├── scripts/
 │   └── test-fetch.js     # Stage 1: fetch once and print a table
-├── server.js             # Stage 2: Express server, /api/aircraft with caching
+├── server.js             # Express server: /api/aircraft (cached), /api/config, serves public/
 ├── .env.example          # Template for your secrets (safe to commit)
 ├── .env                  # Your real secrets (you create this; never committed)
 ├── .gitignore            # Files git should ignore (node_modules, .env, …)
@@ -266,6 +348,8 @@ The server caches responses so that extra browser tabs don't cost extra credits.
 | `Could not reach OpenSky` | No internet connection, or a firewall is blocking `opensky-network.org`. |
 | `npm.ps1 cannot be loaded because running scripts is disabled on this system` (Windows) | PowerShell blocks script files by default, and `npm` starts from one. Run `Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned` once (answer `Y`), or type `npm.cmd` instead of `npm`. |
 | `Cannot find package 'dotenv'` or `'express'` | Run `npm install` first. |
+| Map tiles say **"API key required"** | Add your free CARTO key to `.env` as `CARTO_API_KEY=…` (see step 2), then restart the server. The terminal should say `Map tiles: CARTO key set`. |
+| Map is completely blank, or no planes appear | Press F12 → Console and look for red errors. If `leaflet.js` failed to load, check your internet connection (Leaflet and the fonts come from the internet). |
 | `Port 3000 is already in use` | The server is probably already running in another terminal window. Stop it with Ctrl+C there, or add `PORT=3001` to `.env` and open <http://localhost:3001>. |
 | Browser says *can't connect to localhost* | The server isn't running. Start it with `npm start` and keep that terminal open. |
 | Very few aircraft | OpenSky's data comes from volunteers' ground receivers, and there are fewer of them around Oman than in Europe. Commercial apps like Flightradar24 have more receivers, so they show more aircraft. |
