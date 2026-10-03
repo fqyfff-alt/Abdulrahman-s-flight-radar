@@ -1,0 +1,17 @@
+# Packages installed by npm. Anyone can recreate this folder with "npm install",
+# so it never belongs in git (and it's huge).
+node_modules/
+
+# SECRETS: your OpenSky client ID and secret live in .env. Never commit it!
+# (.env.example is a safe template with no real values, so that one IS committed.)
+.env
+
+# The credentials file you can download from your OpenSky account page.
+# Ignored in case you save it into this folder by accident.
+credentials.json
+
+# Clutter created by operating systems and editors
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

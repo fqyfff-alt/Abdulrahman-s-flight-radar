@@ -1,0 +1,16 @@
+{
+  "name": "muscat-flight-radar",
+  "version": "0.1.0",
+  "description": "Live flight tracker for the airspace around Muscat, Oman, using the OpenSky Network REST API",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test-fetch": "node scripts/test-fetch.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "dotenv": "^18.0.5"
+  }
+}
