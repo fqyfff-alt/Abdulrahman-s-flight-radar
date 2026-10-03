@@ -10,7 +10,7 @@
 // credentials are in place before lib/opensky.js reads them.
 import 'dotenv/config';
 
-import { BOUNDING_BOX, fetchAircraft, hasCredentials } from '../lib/opensky.js';
+import { BOUNDING_BOX, describeError, fetchAircraft, hasCredentials } from '../lib/opensky.js';
 
 // ---------------------------------------------------------------------------
 // Unit conversions: OpenSky uses SI units, but aviation mostly uses feet & knots
@@ -85,24 +85,6 @@ function formatTime(unixSeconds) {
   return `${utc} UTC (${muscat} Muscat time)`;
 }
 
-/** Explain common errors in plain language. */
-function explainError(error) {
-  if (error.status === 429) {
-    const wait = error.retryAfterSeconds
-      ? ` Credits come back in about ${Math.ceil(error.retryAfterSeconds / 60)} minutes.`
-      : '';
-    return `OpenSky says you're out of API credits for now (HTTP 429).${wait}`;
-  }
-  if (error.name === 'TimeoutError') {
-    return 'OpenSky did not answer in time. It may be busy — try again in a minute.';
-  }
-  if (error.message === 'fetch failed') {
-    // fetch() hides the real network problem in error.cause (e.g. ENOTFOUND = no DNS).
-    return `Could not reach OpenSky (${error.cause?.code ?? error.cause?.message}). Check your internet connection.`;
-  }
-  return error.message;
-}
-
 async function main() {
   const { lamin, lamax, lomin, lomax } = BOUNDING_BOX;
   console.log(`Fetching aircraft between latitude ${lamin}–${lamax}° N and longitude ${lomin}–${lomax}° E…`);
@@ -132,6 +114,6 @@ async function main() {
 try {
   await main(); // "top-level await" is allowed because this file is an ES module
 } catch (error) {
-  console.error(`\n❌ ${explainError(error)}`);
+  console.error(`\n❌ ${describeError(error)}`);
   process.exitCode = 1; // tell the terminal the script failed
 }

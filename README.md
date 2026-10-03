@@ -9,8 +9,8 @@ It's being built in stages so each part can be tested before the next one starts
 | Stage | What it adds | Status |
 | ----- | ------------ | ------ |
 | 1 | Test script that fetches the data once and prints a table in the terminal | ✅ done |
-| 2 | Backend server with `GET /api/aircraft` (caching, rate‑limit handling) | ⏳ next |
-| 3 | Basic map with the dark theme, plane markers, and popups | |
+| 2 | Backend server with `GET /api/aircraft` (caching, rate‑limit handling) | ✅ done |
+| 3 | Basic map with the dark theme, plane markers, and popups | ⏳ next |
 | 4 | Altitude colours, legend, smooth motion, and trails | |
 | 5 | Side panel, status bar, airport marker, range rings, arrivals estimate | |
 | 6 | Opening animation that draws the country borders | |
@@ -74,8 +74,12 @@ npm install
 ```
 
 This reads `package.json` and downloads the packages the project uses into
-`node_modules/`. So far that's just [`dotenv`](https://www.npmjs.com/package/dotenv),
-which loads `.env` into `process.env`.
+`node_modules/`:
+
+- [`dotenv`](https://www.npmjs.com/package/dotenv) loads `.env` into `process.env`.
+- [`express`](https://expressjs.com/) is a small web server framework.
+
+Run `npm install` again whenever you pull new code, in case a stage added a package.
 
 ---
 
@@ -117,6 +121,101 @@ Node's `console.table` puts quotes around text values, which is normal.
 
 ---
 
+## Stage 2: the backend server
+
+```bash
+npm start
+```
+
+The terminal should show:
+
+```text
+✈️  Muscat Airspace server running at http://localhost:3000
+   Aircraft API:  http://localhost:3000/api/aircraft
+   OpenSky mode:  authenticated (4,000 credits/day)
+   Press Ctrl+C to stop.
+```
+
+Then open these in your browser:
+
+- <http://localhost:3000>: a placeholder page (served from `public/`) that calls the
+  API and shows a one‑line summary. Stage 3 replaces it with the map.
+- <http://localhost:3000/api/aircraft>: the raw JSON. Firefox and Chrome show it
+  nicely formatted (Firefox has a built‑in JSON viewer).
+
+Refresh the JSON page a few times. In the terminal you'll see the cache at work:
+
+```text
+[10:32:26] OpenSky: 3 aircraft, 3997 credits left      ← real request (1 credit)
+[10:32:31] Served from cache (5 s old)                 ← free
+[10:32:47] OpenSky: 3 aircraft, 3996 credits left      ← cache expired after 20 s
+```
+
+> **Tip:** `npm run dev` starts the server with `node --watch`, which restarts it
+> automatically every time you save a `.js` file. Handy while experimenting. (Each
+> restart empties the cache, so the next request costs a credit.)
+
+### What `/api/aircraft` returns
+
+```json
+{
+  "timestamp": 1791009139,
+  "aircraftCount": 3,
+  "creditsRemaining": 3997,
+  "rateLimited": false,
+  "retryAfterSeconds": null,
+  "fromCache": false,
+  "aircraft": [
+    {
+      "icao24": "500472",
+      "callsign": "T7AVRO",
+      "originCountry": "San Marino",
+      "timePosition": 1791008871,
+      "lastContact": 1791009132,
+      "longitude": 57.4465,
+      "latitude": 23.5233,
+      "baroAltitude": 8808.72,
+      "onGround": false,
+      "velocity": 184.23,
+      "trueTrack": 78.56,
+      "verticalRate": 0.65,
+      "sensors": null,
+      "geoAltitude": 9372.6,
+      "squawk": "1722",
+      "spi": false,
+      "positionSource": 0
+    }
+  ]
+}
+```
+
+| Field | Meaning |
+| ----- | ------- |
+| `timestamp` | When OpenSky says these positions were valid (Unix time, seconds since 1 Jan 1970). |
+| `aircraftCount` | How many aircraft are in the list. |
+| `creditsRemaining` | OpenSky credits left today (from the `X-Rate-Limit-Remaining` header). |
+| `rateLimited` | `true` if OpenSky answered *429 Too Many Requests*. The list is then the **last data we had**, not an error. |
+| `retryAfterSeconds` | While rate limited: seconds until the server will ask OpenSky again. |
+| `fromCache` | `true` if the answer came from the server's 20‑second memory instead of a new OpenSky request. |
+| `aircraft` | One object per aircraft. Units are metres and m/s, exactly as OpenSky sends them. Every field is explained in `parseStateVector()` in `lib/opensky.js`. Aircraft without a position are left out. |
+
+If OpenSky can't be reached at all, the API answers with HTTP **502** and
+`{ "error": "…a plain-language explanation…" }`.
+
+### How the server saves credits
+
+1. **20‑second cache.** The server remembers OpenSky's last answer. Any request
+   within 20 seconds (a page refresh, a second tab, a friend on your Wi‑Fi) gets
+   that copy for free.
+2. **No duplicate requests.** If several requests arrive at the same moment just
+   after the cache expires, only the first one contacts OpenSky; the others wait
+   for its answer.
+3. **Backing off when rate limited.** After a 429, the server stops contacting
+   OpenSky until the wait time OpenSky gave has passed, and keeps serving the last
+   data it had with `"rateLimited": true`.
+
+---
+
 ## About API credits
 
 Every request to `/api/states/all` costs credits, depending on the size of the area.
@@ -132,7 +231,7 @@ Once the web app is running, it asks for fresh data every 30 seconds:
 
 Anonymous credits are counted **per IP address**, so on shared Wi‑Fi (school,
 university, café) other people's requests can use up the same 400 credits.
-The server (Stage 2) caches responses so that extra browser tabs don't cost extra credits.
+The server caches responses so that extra browser tabs don't cost extra credits.
 
 ---
 
@@ -142,8 +241,11 @@ The server (Stage 2) caches responses so that extra browser tabs don't cost extr
 .
 ├── lib/
 │   └── opensky.js        # Talks to OpenSky: login token, fetching, array → object conversion
+├── public/
+│   └── index.html        # The web page (a placeholder until Stage 3)
 ├── scripts/
 │   └── test-fetch.js     # Stage 1: fetch once and print a table
+├── server.js             # Stage 2: Express server, /api/aircraft with caching
 ├── .env.example          # Template for your secrets (safe to commit)
 ├── .env                  # Your real secrets (you create this; never committed)
 ├── .gitignore            # Files git should ignore (node_modules, .env, …)
@@ -161,7 +263,9 @@ The server (Stage 2) caches responses so that extra browser tabs don't cost extr
 | `OpenSky login failed (HTTP 401)` | The client ID or secret is wrong. Copy them again from your OpenSky account page. |
 | `out of API credits (HTTP 429)` | You've used today's credits. Wait for the time shown, or add credentials to get 10× more. |
 | `Could not reach OpenSky` | No internet connection, or a firewall is blocking `opensky-network.org`. |
-| `Cannot find package 'dotenv'` | Run `npm install` first. |
+| `Cannot find package 'dotenv'` or `'express'` | Run `npm install` first. |
+| `Port 3000 is already in use` | The server is probably already running in another terminal window. Stop it with Ctrl+C there, or add `PORT=3001` to `.env` and open <http://localhost:3001>. |
+| Browser says *can't connect to localhost* | The server isn't running. Start it with `npm start` and keep that terminal open. |
 | Very few aircraft | OpenSky's data comes from volunteers' ground receivers, and there are fewer of them around Oman than in Europe. Commercial apps like Flightradar24 have more receivers, so they show more aircraft. |
 
 ---

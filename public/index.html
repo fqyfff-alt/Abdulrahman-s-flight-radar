@@ -1,0 +1,49 @@
+<!doctype html>
+<!--
+  Temporary placeholder page for Stage 2. It proves two things:
+    1. The server serves files from the /public folder.
+    2. The browser can call our /api/aircraft endpoint.
+  Stage 3 replaces this file with the real map.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Muscat Airspace</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 2rem 1rem;
+        background: #0b0f14;
+        color: #e6edf3;
+        font-family: system-ui, sans-serif;
+        line-height: 1.5;
+      }
+      a { color: #2dd4bf; }
+      code { font-family: ui-monospace, monospace; color: #8b98a5; }
+    </style>
+  </head>
+  <body>
+    <h1>Muscat Airspace</h1>
+    <p>The backend is running. The map arrives in Stage 3.</p>
+    <p id="result">Asking <code>/api/aircraft</code>…</p>
+    <p><a href="/api/aircraft">View the raw JSON</a></p>
+
+    <script>
+      // Call our own backend (not OpenSky directly) and show a one-line summary.
+      fetch('/api/aircraft')
+        .then((response) => response.json())
+        .then((data) => {
+          const result = document.getElementById('result');
+          if (data.error) {
+            result.textContent = `Error: ${data.error}`;
+          } else {
+            result.textContent =
+              `${data.aircraftCount} aircraft over Muscat right now · ` +
+              `${data.creditsRemaining ?? '?'} API credits left` +
+              (data.rateLimited ? ' · RATE LIMITED (showing cached data)' : '');
+          }
+        });
+    </script>
+  </body>
+</html>
