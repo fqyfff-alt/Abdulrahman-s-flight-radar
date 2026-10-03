@@ -7,7 +7,8 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
-    "test-fetch": "node scripts/test-fetch.js"
+    "test-fetch": "node scripts/test-fetch.js",
+    "test-weather": "node scripts/test-weather.js"
   },
   "engines": {
     "node": ">=18"

@@ -488,6 +488,62 @@ settings measured for the old length would chop the new lines into pieces. See
 
 ---
 
+## Live weather for Muscat airport (OOMS)
+
+The app is getting live aviation weather for Muscat International Airport, built in
+stages like the rest of the project:
+
+| Stage | What it adds | Status |
+| ----- | ------------ | ------ |
+| W1 | Test script that fetches the METAR and TAF once and prints them | ✅ done |
+| W2 | `GET /api/weather` on the server (cleaned data, 10‑minute cache) | ⏳ next |
+| W3 | Weather strip in the status bar | |
+| W4 | Weather panel with a METAR explainer | |
+| W5 | Wind arrow, likely runway in use, and crosswind on the map | |
+| W6 | Weather alerts | |
+
+### Where the data comes from
+
+The [Aviation Weather Center](https://aviationweather.gov/data/api/) (part of the US
+National Weather Service) publishes weather reports for airports worldwide, free and
+without an API key:
+
+- **METAR**: the *current* weather measured at the airport, issued every 30–60 minutes
+  (plus extra "SPECI" reports when the weather changes suddenly).
+  <https://aviationweather.gov/api/data/metar?ids=OOMS&format=json>
+- **TAF** (Terminal Aerodrome Forecast): the *forecast* for the airport for the next
+  24–30 hours. <https://aviationweather.gov/api/data/taf?ids=OOMS&format=json>
+
+Each request sends a `User-Agent` header naming this app, as the AWC asks.
+
+### Weather stage W1: print the raw reports
+
+```bash
+npm run test-weather
+```
+
+You should see the raw METAR line (for example
+`METAR OOMS 030750Z 01007KT 9999 FEW030 33/28 Q1015 NOSIG`), a table of every field in
+the METAR with its value and meaning, the raw TAF, and a table of its forecast periods.
+Add `-- --json` to also print the complete responses:
+
+```bash
+npm run test-weather -- --json
+```
+
+Things worth noticing in the real data (the later stages handle all of them):
+
+| What | Detail |
+| ---- | ------ |
+| Missing fields | `wgst` (gusts) and `wxString` (weather like haze or rain) are **left out completely** when there's nothing to report, not set to `null`. |
+| Visibility units | `visib` is in **statute miles**, and can be text: `"6+"` means 6 miles or more. The raw METAR uses metres (`9999` = 10 km or more), which is what Oman uses. |
+| Wind | `wdir` is a number, or `"VRB"` when the wind direction is variable. `wspd` is always knots, even where the airport reports metres per second. |
+| Pressure | `altim` is in hPa (matches `Q1015` in the raw text). |
+| No clouds | `clouds` is an empty list, with `cover` set to `"CLR"` or `"CAVOK"`. |
+| No report | The API answers **HTTP 204** (no content, empty body) if an airport has no report. |
+
+---
+
 ## About API credits
 
 Every request to `/api/states/all` costs credits, depending on the size of the area.
@@ -513,14 +569,16 @@ The server caches responses so that extra browser tabs don't cost extra credits.
 .
 ├── lib/
 │   ├── env-check.js      # Explains why credentials weren't found (missing .env, wrong name, …)
-│   └── opensky.js        # Talks to OpenSky: login token, fetching, array → object conversion
+│   ├── opensky.js        # Talks to OpenSky: login token, fetching, array → object conversion
+│   └── weather.js        # Fetches the METAR and TAF from aviationweather.gov
 ├── public/
 │   ├── index.html        # The web page
 │   ├── css/
 │   │   └── style.css     # Dark theme (colours as CSS variables)
 │   └── js/               # Frontend code, one job per file (see Stage 3)
 ├── scripts/
-│   └── test-fetch.js     # Stage 1: fetch once and print a table
+│   ├── test-fetch.js     # Stage 1: fetch once and print a table
+│   └── test-weather.js   # Weather W1: print the OOMS METAR and TAF
 ├── server.js             # Express server: /api/aircraft (cached), /api/config, serves public/
 ├── .env.example          # Template for your secrets (safe to commit)
 ├── .env                  # Your real secrets (you create this; never committed)
@@ -539,6 +597,7 @@ The server caches responses so that extra browser tabs don't cost extra credits.
 | `OpenSky login failed (HTTP 401)` | The client ID or secret is wrong. Copy them again from your OpenSky account page. |
 | `out of API credits (HTTP 429)` | You've used today's credits. Wait for the time shown, or add credentials to get 10× more. |
 | `Could not reach OpenSky` | No internet connection, or a firewall is blocking `opensky-network.org`. |
+| `Could not reach aviationweather.gov` | No internet connection, or a firewall is blocking the weather service. |
 | `npm.ps1 cannot be loaded because running scripts is disabled on this system` (Windows) | PowerShell blocks script files by default, and `npm` starts from one. Run `Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned` once (answer `Y`), or type `npm.cmd` instead of `npm`. |
 | `Cannot find package 'dotenv'` or `'express'` | Run `npm install` first. |
 | Map tiles say **"API key required"** | Add your free CARTO key to `.env` as `CARTO_API_KEY=…` (see step 2), then restart the server. The terminal should say `Map tiles: CARTO key set`. |
