@@ -99,3 +99,38 @@ export const NEARBY_RADIUS_KM = 30;
 // lower than this, and descending.
 export const ARRIVAL_MAX_DISTANCE_KM = 60;
 export const ARRIVAL_MAX_ALTITUDE_FEET = 10_000;
+
+// ---------------------------------------------------------------------------
+// Opening animation: country borders (see borders.js and intro.js)
+// ---------------------------------------------------------------------------
+
+// Country outlines from the "world-atlas" package (made from Natural Earth
+// data) in TopoJSON format. The version is pinned exactly, so the integrity
+// fingerprint always matches the file.
+export const BORDERS_URL = 'https://cdn.jsdelivr.net/npm/world-atlas@2.0.2/countries-50m.json';
+export const BORDERS_INTEGRITY = 'sha256-BDQs3B4wFrzX2xYw3pVoTWe3n+PIxGAyHoeu9GlQI5Q=';
+
+// Countries are matched by their ISO 3166-1 numeric code (see borders.js).
+export const OMAN_ID = '512';
+// Neighbours, in the order they draw in:
+export const NEIGHBOR_IDS = [
+  '784', // United Arab Emirates
+  '682', // Saudi Arabia
+  '887', // Yemen
+  '634', // Qatar
+  '364', // Iran
+  '586', // Pakistan
+];
+
+// Timings, in milliseconds unless the name says otherwise. (The fades are CSS
+// transitions; see "Opening animation" in style.css.)
+export const INTRO = {
+  borderLoadTimeoutMs: 3000, // give up on the animation if borders take longer
+  omanDrawMs: 1800,
+  neighborsStartMs: 250, // the first neighbour starts this long after Oman
+  neighborStaggerMs: 180, // each further neighbour starts this much later
+  neighborDrawMs: 1000,
+  flyToMuscatSeconds: 1.2, // Leaflet's flyTo takes seconds
+  ringExpandMs: 800,
+  ringStaggerMs: 120,
+};

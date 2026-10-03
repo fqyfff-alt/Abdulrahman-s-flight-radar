@@ -1,10 +1,10 @@
 /**
  * main.js — the starting point of the web page.
  *
- * It creates the map and the other parts of the page, asks our server for
- * aircraft every 30 seconds and passes the data to each part (map, side panel,
- * airport label, status bar), and moves the planes forward every second in
- * between so they glide instead of jumping.
+ * It creates the map and the other parts of the page, plays the opening
+ * animation, asks our server for aircraft every 30 seconds and passes the data
+ * to each part (map, side panel, airport label, status bar), and moves the
+ * planes forward every second in between so they glide instead of jumping.
  *
  * Because index.html loads this file with type="module", it runs only after
  * the whole page has been read, so <div id="map"> already exists.
@@ -14,11 +14,17 @@ import { focusAircraft, initAircraft, moveAircraftForward, updateAircraft } from
 import { initAirport, updateAirport } from './airport.js';
 import { summariseAirspace } from './airspace.js';
 import { fetchAircraftData, fetchMapConfig } from './api.js';
+import { loadBorders } from './borders.js';
 import { ANIMATION_INTERVAL_MS, REFRESH_INTERVAL_MS } from './config.js';
 import { refreshPopupPadding } from './layout.js';
+import { playIntro } from './intro.js';
 import { createMap } from './map.js';
 import { highlightSelectedRow, initPanel, updatePanel } from './panel.js';
 import { showConnectionProblem, showStatus } from './status.js';
+
+// Start downloading the country borders for the opening animation right away,
+// so the download happens while everything else is being set up.
+const bordersPromise = loadBorders();
 
 // Get the map-tile key from our server first, then build the map with it.
 // ("await" at the top level of a file is allowed in modules.)
@@ -98,8 +104,11 @@ function logUpdate(data) {
   }
 }
 
-refresh(); // first load
+refresh(); // first load: runs in the background while the opening animation plays
 
 // Smooth motion: move every plane a little along its track once per second.
 // (setInterval is fine here: moving planes is instant, so calls can't overlap.)
 setInterval(moveAircraftForward, ANIMATION_INTERVAL_MS);
+
+// The opening animation: borders draw in, then everything fades in.
+playIntro(map, bordersPromise);

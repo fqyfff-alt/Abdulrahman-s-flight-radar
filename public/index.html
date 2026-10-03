@@ -32,7 +32,9 @@
     <link rel="stylesheet" href="css/style.css" />
   </head>
 
-  <body>
+  <!-- The page starts in "intro" mode: only the dark background shows until the
+       opening animation (intro.js) removes these classes step by step. -->
+  <body class="intro-active intro-drawing">
     <!-- Status bar. status.js changes data-state (loading / live / limited /
          error) and style.css colours the dot to match. -->
     <header class="status-bar" id="status-bar" data-state="loading">
@@ -114,6 +116,13 @@
       src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
       integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
       crossorigin=""
+    ></script>
+
+    <!-- topojson-client turns the TopoJSON border data into GeoJSON (see borders.js) -->
+    <script
+      src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"
+      integrity="sha256-Jc0CrkhsxQY+AhWk5M+xXeg3AMh6xIusTVfcaq8+u4k="
+      crossorigin="anonymous"
     ></script>
 
     <!-- type="module" lets our files use import/export, the same syntax as the server -->

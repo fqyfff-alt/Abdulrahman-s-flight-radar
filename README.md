@@ -4,7 +4,7 @@ A web app that shows real aircraft flying over Muscat, Oman, on a dark
 air‑traffic‑control‑style map, using live data from the
 [OpenSky Network](https://opensky-network.org/).
 
-It's being built in stages so each part can be tested before the next one starts:
+It was built in stages, each one tested before the next began:
 
 | Stage | What it adds | Status |
 | ----- | ------------ | ------ |
@@ -13,7 +13,7 @@ It's being built in stages so each part can be tested before the next one starts
 | 3 | Basic map with the dark theme, plane markers, and popups | ✅ done |
 | 4 | Altitude colours, legend, smooth motion, and trails | ✅ done |
 | 5 | Side panel, status bar, airport marker, range rings, arrivals estimate | ✅ done |
-| 6 | Opening animation that draws the country borders | ⏳ next |
+| 6 | Opening animation that draws the country borders | ✅ done |
 
 ---
 
@@ -298,6 +298,8 @@ each other, just like the server code.
 | `public/js/panel.js` | The side panel / phone bottom sheet: lists, tap and swipe, row clicks |
 | `public/js/status.js` | The status bar and the "Scanning airspace…" message |
 | `public/js/layout.js` | Works out which parts of the map the panels cover, so popups and fly‑to avoid them |
+| `public/js/borders.js` | Downloads the country outlines (TopoJSON), picks Oman and its neighbours, draws them as SVG paths |
+| `public/js/intro.js` | The opening animation: the line‑drawing timeline, map lock, skip, and fallbacks |
 | `public/js/api.js` | Talks to our server (`/api/config`, `/api/aircraft`) |
 
 ---
@@ -419,6 +421,73 @@ distance = Earth's radius × angle       ← arc length = radius × angle (in ra
 
 ---
 
+## Stage 6: the opening animation
+
+```bash
+npm start
+```
+
+Open <http://localhost:3000> (refresh the page to watch it again). In about 4 seconds:
+
+1. The screen starts dark. **Oman's outline draws itself** in glowing teal, all the way around.
+2. Just after it starts, **the neighbours follow** one after another in grey: the UAE,
+   Saudi Arabia, Yemen, Qatar, Iran and Pakistan.
+3. When the outlines are done, **the map fades in** as the view glides in to Muscat.
+4. **The status bar, side panel and aircraft fade in**, and the radar range rings expand
+   outwards from the airport.
+5. The borders stay: Oman as a thinner, dimmer teal line, the neighbours as faint grey.
+
+Things to try:
+
+| Do this | What should happen |
+| ------- | ------------------ |
+| Click anywhere or press any key during the animation | It skips straight to the finished map |
+| Try to drag or scroll‑zoom during the animation | Nothing: the map is locked until the end |
+| Turn on your computer's *reduce motion* setting (Windows: Settings → Accessibility → Visual effects → Animation effects **off**; Mac: System Settings → Accessibility → Display → Reduce motion) | No animation: everything appears straight away |
+
+Aircraft data is fetched while the animation plays, so the planes are ready when it
+ends. If they're still loading, you'll see "Scanning airspace…". If the border data can't
+be downloaded (or takes more than 3 seconds), the animation is skipped and the map
+appears normally.
+
+### How the borders are loaded
+
+The outlines come from the [world-atlas](https://github.com/topojson/world-atlas) package
+(`countries-50m.json`, made from Natural Earth data) in **TopoJSON** format. TopoJSON
+stores each stretch of border only once, even where two countries share it, which keeps
+the file small (about 245 KB to download). The `topojson-client` library's
+`topojson.feature()` turns it back into normal GeoJSON for Leaflet.
+
+Countries are picked by their **ISO 3166‑1 numeric code**, a standard number that never
+changes (Oman = 512, UAE = 784, Saudi Arabia = 682, Yemen = 887, Qatar = 634,
+Iran = 364, Pakistan = 586). Codes are safer to match on than names, which can be spelled
+in different ways.
+
+The animation starts zoomed out so the whole of Oman fits on screen. At zoom 8 most of
+the country (Salalah is about 800 km south of Muscat) would be out of view, especially
+on a phone.
+
+### How the line‑drawing trick works
+
+Every border is an SVG `<path>`. SVG can draw a line as dashes: `stroke-dasharray`
+sets the dash pattern and `stroke-dashoffset` slides it along the line.
+
+```text
+length = path.getTotalLength()          ← how long the outline is, in pixels
+
+stroke-dasharray:  length               ← ONE dash as long as the whole outline, then an equal gap
+stroke-dashoffset: length → 0           ← start with the gap over the line (invisible),
+                                          slide until the dash covers it (fully drawn)
+```
+
+The slide is animated with the Web Animations API (`path.animate(...)`) using
+`ease-in-out` timing, so each line starts slowly, speeds up, and settles. Afterwards the
+dash settings are removed: Leaflet redraws the paths whenever you zoom, and dash
+settings measured for the old length would chop the new lines into pieces. See
+`drawOutline()` in `public/js/intro.js`.
+
+---
+
 ## About API credits
 
 Every request to `/api/states/all` costs credits, depending on the size of the area.
@@ -473,6 +542,7 @@ The server caches responses so that extra browser tabs don't cost extra credits.
 | `npm.ps1 cannot be loaded because running scripts is disabled on this system` (Windows) | PowerShell blocks script files by default, and `npm` starts from one. Run `Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned` once (answer `Y`), or type `npm.cmd` instead of `npm`. |
 | `Cannot find package 'dotenv'` or `'express'` | Run `npm install` first. |
 | Map tiles say **"API key required"** | Add your free CARTO key to `.env` as `CARTO_API_KEY=…` (see step 2), then restart the server. The terminal should say `Map tiles: CARTO key set`. |
+| The opening animation doesn't play | Check whether *reduce motion* is turned on in your system settings (that skips it on purpose). Otherwise press F12 → Console: a yellow "Country borders unavailable" message means the border data couldn't be downloaded. |
 | Map is completely blank, or no planes appear | Press F12 → Console and look for red errors. If `leaflet.js` failed to load, check your internet connection (Leaflet and the fonts come from the internet). |
 | `Port 3000 is already in use` | The server is probably already running in another terminal window. Stop it with Ctrl+C there, or add `PORT=3001` to `.env` and open <http://localhost:3001>. |
 | Browser says *can't connect to localhost* | The server isn't running. Start it with `npm start` and keep that terminal open. |
