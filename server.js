@@ -1,5 +1,5 @@
 /**
- * server.js — the backend for Muscat Airspace (Stage 2).
+ * server.js — the backend for Muscat Airspace.
  *
  * Run it with:   npm start        (or  npm run dev  to auto-restart when you edit code)
  *
@@ -17,6 +17,8 @@
  *
  * What it does:
  *   GET /api/aircraft  → JSON with the aircraft over Muscat (cached for 20 s)
+ *   GET /api/weather   → JSON with the weather at Muscat airport (cached for 10 min)
+ *   GET /api/config    → settings the page needs (the map-tile key)
  *   GET /anything-else → files from the /public folder (the web page)
  */
 
@@ -27,6 +29,7 @@ import express from 'express';
 import { fileURLToPath } from 'node:url';
 
 import { describeError, fetchAircraft, hasCredentials } from './lib/opensky.js';
+import { describeWeatherError, fetchWeather } from './lib/weather.js';
 
 // ---------------------------------------------------------------------------
 // Settings
@@ -148,6 +151,92 @@ async function getAircraftData() {
 }
 
 // ---------------------------------------------------------------------------
+// Weather at Muscat airport (see lib/weather.js)
+// ---------------------------------------------------------------------------
+
+// METARs are only issued every 30–60 minutes, so asking more often than every
+// 10 minutes would just return the same report again.
+const WEATHER_CACHE_DURATION_MS = 10 * 60_000;
+
+// After a failed request, wait this long before asking the AWC again.
+const WEATHER_RETRY_PAUSE_MS = 60_000;
+
+let cachedWeather = null; // last good result from fetchWeather()
+let weatherCachedAt = 0; // when it was saved (ms)
+let weatherRetryAt = 0; // after a failure: don't try again before this moment (ms)
+let lastWeatherError = null; // plain-language message for the last failure
+let weatherRequestInProgress = null; // Promise of a request on its way
+
+/** A short one-line description of the weather, for the terminal log. */
+function describeWeatherForLog({ metar }) {
+  if (!metar) {
+    return 'no METAR available';
+  }
+  const time = new Date(metar.observedAt * 1000).toLocaleTimeString('en-GB', {
+    timeZone: 'UTC',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+  const { wind } = metar;
+  let windText = 'unknown';
+  if (wind?.isCalm) {
+    windText = 'calm';
+  } else if (wind) {
+    const direction = wind.isVariable ? 'VRB' : `${String(wind.directionDeg).padStart(3, '0')}°`;
+    windText = `${direction} ${wind.speedKt} kt${wind.gustKt ? ` gusting ${wind.gustKt}` : ''}`;
+  }
+  return `METAR ${time} UTC, ${metar.flightCategory ?? '?'}, wind ${windText}, ${metar.temperatureC ?? '?'}°C`;
+}
+
+/**
+ * Fetch fresh weather and save it. If the AWC can't be reached, answer with
+ * the last good weather marked `stale: true`. With nothing saved yet, throw,
+ * so the route can send an error.
+ */
+async function refreshWeather() {
+  try {
+    const weather = await fetchWeather();
+    cachedWeather = { ...weather, fetchedAt: Math.floor(Date.now() / 1000) };
+    weatherCachedAt = Date.now();
+    lastWeatherError = null;
+    log(`Weather: ${describeWeatherForLog(weather)}`);
+    return { ...cachedWeather, stale: false, fromCache: false };
+  } catch (error) {
+    lastWeatherError = describeWeatherError(error);
+    weatherRetryAt = Date.now() + WEATHER_RETRY_PAUSE_MS;
+    log(`Weather error: ${lastWeatherError}${cachedWeather ? ' (serving the last good weather, marked stale)' : ''}`);
+    if (cachedWeather) {
+      return { ...cachedWeather, stale: true, fromCache: true, error: lastWeatherError };
+    }
+    throw error;
+  }
+}
+
+/** Return the weather: from the cache if it's fresh, otherwise from the AWC. */
+async function getWeather() {
+  // 1. Fresh enough? Answer from memory.
+  if (cachedWeather && Date.now() - weatherCachedAt < WEATHER_CACHE_DURATION_MS) {
+    return { ...cachedWeather, stale: false, fromCache: true };
+  }
+
+  // 2. A request failed a moment ago? Don't hammer the AWC; reuse what we have.
+  if (Date.now() < weatherRetryAt) {
+    if (cachedWeather) {
+      return { ...cachedWeather, stale: true, fromCache: true, error: lastWeatherError };
+    }
+    throw new Error(lastWeatherError);
+  }
+
+  // 3. Ask the AWC, sharing one request between visitors who ask at the same moment.
+  if (weatherRequestInProgress === null) {
+    weatherRequestInProgress = refreshWeather().finally(() => {
+      weatherRequestInProgress = null;
+    });
+  }
+  return weatherRequestInProgress;
+}
+
+// ---------------------------------------------------------------------------
 // The web server
 // ---------------------------------------------------------------------------
 
@@ -164,6 +253,23 @@ app.get('/api/aircraft', async (request, response) => {
     // 502 "Bad Gateway" means: "this server is fine, but the server it depends
     // on (OpenSky) gave it a problem."
     response.status(502).json({ error: message });
+  }
+});
+
+// The weather at Muscat airport. If there's no weather to give at all (the AWC
+// is down and nothing is cached yet), answer with 503 "Service Unavailable"
+// and the same JSON shape with null reports, so the page can show "no
+// weather" without crashing.
+app.get('/api/weather', async (request, response) => {
+  try {
+    response.json(await getWeather());
+  } catch (error) {
+    response.status(503).json({
+      error: describeWeatherError(error),
+      stale: false,
+      metar: null,
+      taf: null,
+    });
   }
 });
 
@@ -203,6 +309,7 @@ app.listen(PORT, (error) => {
 
   console.log(`✈️  Muscat Airspace server running at http://localhost:${PORT}`);
   console.log(`   Aircraft API:  http://localhost:${PORT}/api/aircraft`);
+  console.log(`   Weather API:   http://localhost:${PORT}/api/weather`);
   console.log(
     `   OpenSky mode:  ${hasCredentials() ? 'authenticated (4,000 credits/day)' : 'anonymous (400 credits/day)'}`,
   );

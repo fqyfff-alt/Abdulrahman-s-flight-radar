@@ -496,8 +496,8 @@ stages like the rest of the project:
 | Stage | What it adds | Status |
 | ----- | ------------ | ------ |
 | W1 | Test script that fetches the METAR and TAF once and prints them | ✅ done |
-| W2 | `GET /api/weather` on the server (cleaned data, 10‑minute cache) | ⏳ next |
-| W3 | Weather strip in the status bar | |
+| W2 | `GET /api/weather` on the server (cleaned data, 10‑minute cache) | ✅ done |
+| W3 | Weather strip in the status bar | ⏳ next |
 | W4 | Weather panel with a METAR explainer | |
 | W5 | Wind arrow, likely runway in use, and crosswind on the map | |
 | W6 | Weather alerts | |
@@ -541,6 +541,70 @@ Things worth noticing in the real data (the later stages handle all of them):
 | Pressure | `altim` is in hPa (matches `Q1015` in the raw text). |
 | No clouds | `clouds` is an empty list, with `cover` set to `"CLR"` or `"CAVOK"`. |
 | No report | The API answers **HTTP 204** (no content, empty body) if an airport has no report. |
+
+### Weather stage W2: the `/api/weather` endpoint
+
+```bash
+npm start
+```
+
+Open <http://localhost:3000/api/weather>. The terminal logs one line each time the
+server fetches fresh weather, for example:
+
+```text
+[12:24:51] Weather: METAR 07:50 UTC, VFR, wind 010° 7 kt, 33°C
+```
+
+Refresh the page: no new log line appears for 10 minutes, because the answer comes from
+the cache (`"fromCache": true`). METARs only change every 30–60 minutes, so there's no
+point asking more often.
+
+What it returns (shortened):
+
+```json
+{
+  "station": "OOMS",
+  "metar": {
+    "raw": "METAR OOMS 030750Z 01007KT 9999 FEW030 33/28 Q1015 NOSIG",
+    "observedAt": 1791013800,
+    "flightCategory": "VFR",
+    "wind": { "directionDeg": 10, "speedKt": 7, "gustKt": null, "isCalm": false, "isVariable": false,
+              "variableFromDeg": null, "variableToDeg": null },
+    "visibility": { "km": 10, "isAtLeast": true },
+    "temperatureC": 33, "dewPointC": 28, "pressureHpa": 1015,
+    "clouds": [{ "cover": "FEW", "baseFt": 3000, "type": null }],
+    "cavok": false,
+    "weather": []
+  },
+  "taf": {
+    "raw": "TAF OOMS 030500Z 0306/0412 02014KT 8000 SCT020 BECMG 0316/0318 24008KT …",
+    "issuedAt": 1791003600, "validFrom": 1791007200, "validTo": 1791115200,
+    "periods": [{ "from": 1791007200, "to": 1791043200, "change": null, "wind": { … },
+                  "visibility": { "km": 8, "isAtLeast": false }, "clouds": [ … ], "weather": [] }, …]
+  },
+  "fetchedAt": 1791015891,
+  "stale": false,
+  "fromCache": false
+}
+```
+
+| Field | Meaning |
+| ----- | ------- |
+| `wind.directionDeg` | Where the wind blows **from**, in degrees. `null` when the wind is calm or variable. |
+| `wind.isCalm` / `wind.isVariable` | Calm = 0 knots. Variable = light wind with no steady direction (`VRB` in the METAR). |
+| `wind.gustKt` | Gust speed in knots, or `null` when there are no gusts. |
+| `wind.variableFromDeg/ToDeg` | Set when the direction swings between two values (e.g. `200V270`). |
+| `visibility.km` / `isAtLeast` | Visibility in km. `isAtLeast: true` means "this or more" (`9999` = 10 km or more). |
+| `clouds` | Real cloud layers only, lowest first; `[]` means no significant cloud. `type` is `CB` (thunderstorm cloud), `TCU` (towering cumulus) or `null`. |
+| `cavok` | "Ceiling And Visibility OK": 10 km+ visibility, no cloud below 5,000 ft, no significant weather. |
+| `weather` | Present‑weather codes such as `HZ` (haze) or `-RA` (light rain). Decoded into words in a later stage. |
+| `taf.periods[].change` | `null` = main forecast, `FM` = from, `BECMG` = becoming (gradual change), `TEMPO` = temporarily, `PROB` = a 30–40 % chance. In TEMPO/PROB periods, anything not mentioned (`null` / `[]`) stays the same. |
+| `stale` | `true` if the weather service couldn't be reached and this is the last good weather (with `error` saying why). |
+
+If the weather service is down and nothing is cached yet, the endpoint answers
+**HTTP 503** with `{ "error": "…", "metar": null, "taf": null }`, so the page can show
+"no weather" instead of breaking. After a failure, the server waits 60 seconds before
+trying the weather service again.
 
 ---
 
