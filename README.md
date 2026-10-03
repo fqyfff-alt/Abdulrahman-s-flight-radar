@@ -302,6 +302,10 @@ each other, just like the server code.
 | `public/js/intro.js` | The opening animation: the line‑drawing timeline, map lock, skip, and fallbacks |
 | `public/js/weather-format.js` | Weather text: wind (`320° 12kt G20`), visibility, temperature, report age, flight category meanings |
 | `public/js/weather-strip.js` | The weather strip in the status bar |
+| `public/js/weather-decode.js` | Weather codes, clouds, compass points and the summary sentence in plain English |
+| `public/js/metar-explainer.js` | Explains every part of a raw METAR |
+| `public/js/taf-summary.js` | The forecast (TAF) in plain English |
+| `public/js/weather-panel.js` | The weather panel: compass, sections, opening and closing |
 | `public/js/api.js` | Talks to our server (`/api/config`, `/api/aircraft`) |
 
 ---
@@ -500,8 +504,8 @@ stages like the rest of the project:
 | W1 | Test script that fetches the METAR and TAF once and prints them | ✅ done |
 | W2 | `GET /api/weather` on the server (cleaned data, 10‑minute cache) | ✅ done |
 | W3 | Weather strip in the status bar | ✅ done |
-| W4 | Weather panel with a METAR explainer | ⏳ next |
-| W5 | Wind arrow, likely runway in use, and crosswind on the map | |
+| W4 | Weather panel with a METAR explainer | ✅ done |
+| W5 | Wind arrow, likely runway in use, and crosswind on the map | ⏳ next |
 | W6 | Weather alerts | |
 
 ### Where the data comes from
@@ -635,6 +639,46 @@ for new weather every 10 minutes, separately from the 30‑second aircraft refre
 
 On phones there's only room for the badge and the wind, so the "Muscat Airspace" title is
 hidden from view (screen readers still read it); the live dot stays.
+
+### Weather stage W4: the weather panel
+
+```bash
+npm start
+```
+
+Click the weather strip in the status bar (or Tab to it and press Enter). A panel opens
+on the right (on phones it slides up from the bottom). From top to bottom:
+
+| Section | What it shows |
+| ------- | ------------- |
+| **Headline** | The flight category and what it means, a plain‑English summary such as *"A few clouds, light northerly wind, hot and humid, good visibility."*, and when the METAR was observed. |
+| **Wind** | Direction and speed, with a compass whose arrow points to where the wind comes **from**. If the direction is swinging (e.g. `200V270`), that range is shaded. Gusts are listed when there are any. |
+| **Temperature and dew point** | Both values, the **spread** between them and the humidity. A note explains that a small spread (3 °C or less) means mist or fog can form; it turns amber when that's the case. |
+| **Visibility, pressure and sky** | Visibility in km, QNH pressure in hPa, cloud layers (*"Few at 3,000 ft, Scattered at 12,000 ft"*) and decoded weather (*"Haze"*, *"Light rain showers"*, *"Thunderstorm nearby"*). |
+| **Forecast (TAF)** | The next 12 hours in plain English, e.g. *"Until 20:00: wind from the north‑northeast (020°) at 14 kt…"* then *"20:00–22:00, becoming: wind from the west‑southwest (240°) at 8 kt."* Times are Muscat time. The raw TAF is under a toggle. |
+| **Raw METAR** | The original report, with a **What does this mean?** toggle that explains every part of it (see below). |
+
+Close the panel with **×**, the **Esc** key, or by clicking the strip again.
+
+**Learning to read a METAR.** Open *What does this mean?* to see each part explained:
+
+```text
+METAR OOMS 030750Z 01007KT 9999 FEW030 33/28 Q1015 NOSIG
+│     │    │       │       │    │      │     │     └ no significant change expected in the next 2 hours
+│     │    │       │       │    │      │     └ pressure (QNH) 1015 hPa
+│     │    │       │       │    │      └ temperature 33 °C / dew point 28 °C
+│     │    │       │       │    └ few clouds (1–2 eighths of the sky) at 3,000 ft
+│     │    │       │       └ visibility 10 km or more
+│     │    │       └ wind from 010° at 7 knots
+│     │    └ day 03, 07:50 UTC ("Z" = Zulu = UTC)
+│     └ airport code
+└ report type
+```
+
+Weather codes follow a pattern: an intensity (`-` light, `+` heavy, `VC` nearby), then an
+optional descriptor (`SH` showers, `TS` thunderstorm, `BL` blowing…), then what it is
+(`RA` rain, `DU` dust, `SA` sand, `HZ` haze, `BR` mist, `FG` fog…). So `-SHRA` is light rain
+showers and `BLSA` is blowing sand. The decoding lives in `public/js/weather-decode.js`.
 
 ---
 

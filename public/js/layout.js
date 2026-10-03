@@ -28,25 +28,31 @@ export function getCoveredEdges() {
 
   const top = statusBar.offsetHeight + GAP;
 
+  // The weather panel, when open, covers the right side (laptop) or the bottom (phone).
+  const weatherPanel = document.getElementById('weather-panel');
+  const isWeatherOpen = weatherPanel.classList.contains('is-open');
+
   if (isPhoneLayout()) {
     // On phones the legend and zoom buttons sit over the top of the map too.
     const legend = document.getElementById('legend').getBoundingClientRect();
     const zoomButtons = document.querySelector('.zoom-controls').getBoundingClientRect();
     // When the sheet is closed, only its header strip is showing.
     const sheetHeight = isPanelExpanded ? panel.offsetHeight : panelHeader.offsetHeight;
+    const weatherSheetHeight = isWeatherOpen ? weatherPanel.offsetHeight : 0;
     return {
       top: legend.bottom + GAP,
       right: window.innerWidth - zoomButtons.left + GAP,
-      bottom: sheetHeight + GAP,
+      bottom: Math.max(sheetHeight, weatherSheetHeight) + GAP,
       left: GAP,
     };
   }
 
+  const right = isWeatherOpen ? window.innerWidth - weatherPanel.offsetLeft + GAP : GAP;
   if (!isPanelExpanded) {
     // A collapsed panel is just its header, under the status bar.
-    return { top: panel.offsetTop + panel.offsetHeight + GAP, right: GAP, bottom: GAP, left: GAP };
+    return { top: panel.offsetTop + panel.offsetHeight + GAP, right, bottom: GAP, left: GAP };
   }
-  return { top, right: GAP, bottom: GAP, left: panel.offsetLeft + panel.offsetWidth + GAP };
+  return { top, right, bottom: GAP, left: panel.offsetLeft + panel.offsetWidth + GAP };
 }
 
 /**

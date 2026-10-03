@@ -21,6 +21,7 @@ import { playIntro } from './intro.js';
 import { createMap } from './map.js';
 import { highlightSelectedRow, initPanel, updatePanel } from './panel.js';
 import { showConnectionProblem, showStatus } from './status.js';
+import { initWeatherPanel, updateWeatherPanel } from './weather-panel.js';
 import { showWeather, showWeatherUnavailable } from './weather-strip.js';
 
 // Start downloading the country borders for the opening animation right away,
@@ -117,10 +118,13 @@ setInterval(moveAircraftForward, ANIMATION_INTERVAL_MS);
 
 let hasWeather = false; // have we shown weather at least once?
 
+initWeatherPanel(); // clicking the weather strip opens the full panel
+
 async function refreshWeather() {
   try {
     const data = await fetchWeatherData();
-    showWeather(data);
+    showWeather(data); // the strip in the status bar
+    updateWeatherPanel(data); // the full panel (redrawn if it's open)
     hasWeather = data.metar !== null;
   } catch (error) {
     // Our own server can't be reached. Keep showing the last weather if we

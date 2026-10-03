@@ -1097,6 +1097,321 @@ body {
 }
 
 /* --------------------------------------------------------------------------
+   Weather panel (opens from the weather strip; a bottom sheet on phones)
+   -------------------------------------------------------------------------- */
+
+.weather-panel {
+  position: fixed;
+  top: calc(var(--status-bar-height) + var(--gap));
+  right: var(--gap);
+  z-index: 1080; /* above the side panel and zoom buttons */
+  width: 370px;
+  max-height: calc(100vh - var(--status-bar-height) - 2 * var(--gap));
+  max-height: calc(100dvh - var(--status-bar-height) - 2 * var(--gap));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: rgba(18, 24, 33, 0.94);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  /* Closed: invisible and slightly raised. "visibility: hidden" also stops
+     keyboard users tabbing into it; it switches off only after the fade. */
+  opacity: 0;
+  transform: translateY(-8px);
+  visibility: hidden;
+  transition: opacity var(--transition-fast), transform var(--transition-fast), visibility 0s 200ms;
+}
+
+.weather-panel.is-open {
+  opacity: 1;
+  transform: none;
+  visibility: visible;
+  transition: opacity var(--transition-fast), transform var(--transition-fast);
+}
+
+.weather-panel-header {
+  position: relative;
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 10px 10px 16px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.weather-panel-header h2 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  outline: none; /* it only receives focus from JavaScript */
+}
+
+.weather-panel-close {
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--color-text-secondary);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.weather-panel-close:hover {
+  background: var(--color-panel-hover);
+  color: var(--color-text);
+}
+
+.weather-panel-close:focus-visible {
+  outline: 2px solid var(--color-accent);
+}
+
+.weather-panel-body {
+  flex: 1;
+  min-height: 0;
+  padding: 0 16px 14px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border) transparent;
+}
+
+.wx-section {
+  padding: 14px 0;
+}
+
+.wx-section + .wx-section {
+  border-top: 1px solid var(--color-border);
+}
+
+.wx-heading {
+  margin: 0 0 10px;
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.wx-category-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.wx-category-name {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.wx-category-meaning {
+  margin: 6px 0 0;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+/* The plain-English summary sentence */
+.wx-summary {
+  margin: 12px 0 0;
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+.wx-observed {
+  margin: 8px 0 0;
+  color: var(--color-text-secondary);
+  font: 400 11px/1.4 var(--font-mono);
+}
+
+/* Wind: compass + readout side by side */
+.wx-wind-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.wind-compass {
+  flex: none;
+  width: 76px;
+  height: 76px;
+}
+
+.wind-compass .compass-ring {
+  fill: rgba(11, 15, 20, 0.6);
+  stroke: var(--color-border);
+  stroke-width: 1.5;
+}
+
+.wind-compass text {
+  fill: var(--color-text-secondary);
+  font: 600 8px var(--font-mono);
+  text-anchor: middle;
+  dominant-baseline: middle;
+}
+
+.wind-compass .compass-centre {
+  fill: var(--color-text);
+  font-size: 9px;
+}
+
+.wind-compass .compass-arrow {
+  fill: var(--color-accent);
+  stroke: var(--color-accent);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+}
+
+.wind-compass .compass-hub {
+  fill: var(--color-accent);
+}
+
+/* Shaded range when the wind direction is swinging (e.g. 200V270) */
+.wind-compass .compass-sector {
+  fill: rgba(45, 212, 191, 0.18);
+}
+
+.wx-big {
+  font: 600 18px/1.2 var(--font-mono);
+}
+
+.wx-sub {
+  margin-top: 3px;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+}
+
+/* Label / value pairs, like the aircraft popups */
+.wx-grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 7px 16px;
+  margin: 0;
+}
+
+.wx-grid dt {
+  color: var(--color-text-secondary);
+  font-size: 12px;
+}
+
+.wx-grid dd {
+  margin: 0;
+  text-align: right;
+  font: 500 13px/1.4 var(--font-mono);
+}
+
+.wx-note {
+  margin: 10px 0 0;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.wx-note strong {
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+.wx-note-warning,
+.wx-note-warning strong {
+  color: var(--color-warning);
+}
+
+.wx-hint {
+  margin: 10px 0 0;
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+/* Forecast lines: the time in teal, the conditions underneath */
+.wx-forecast {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.wx-forecast li {
+  display: grid;
+  gap: 2px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.wx-forecast-when {
+  color: var(--color-accent);
+  font: 600 12px var(--font-mono);
+}
+
+/* Raw METAR / TAF text */
+.wx-raw {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: rgba(11, 15, 20, 0.7);
+  font: 400 12px/1.55 var(--font-mono);
+  white-space: pre-wrap; /* wrap long reports instead of scrolling sideways */
+  overflow-wrap: anywhere;
+}
+
+/* The "What does this mean?" / "Raw TAF" toggles (<details> elements) */
+.wx-section details {
+  margin-top: 10px;
+}
+
+.wx-section summary {
+  width: fit-content;
+  color: var(--color-accent);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.wx-section summary:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+.wx-section details[open] > .wx-raw {
+  margin-top: 8px;
+}
+
+/* The METAR explainer: each code next to what it means */
+.metar-explainer {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px 12px;
+  margin: 12px 0 0;
+}
+
+.metar-explainer dt code {
+  display: inline-block;
+  max-width: 120px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(45, 212, 191, 0.1);
+  color: var(--color-text);
+  font: 600 12px/1.5 var(--font-mono);
+  overflow-wrap: anywhere;
+}
+
+.metar-explainer dd {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+/* --------------------------------------------------------------------------
    Phones (720 px wide or less): the side panel becomes a bottom sheet
    -------------------------------------------------------------------------- */
 
@@ -1261,6 +1576,31 @@ body {
     top: 45%;
     left: 50%;
   }
+
+  /* The weather panel slides up from the bottom, over the aircraft list */
+  .weather-panel {
+    top: auto;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: auto;
+    max-height: 85vh;
+    max-height: 85dvh;
+    border-width: 1px 0 0;
+    border-radius: 16px 16px 0 0;
+    opacity: 1;
+    transform: translateY(100%);
+    transition: transform 250ms ease, visibility 0s 250ms;
+  }
+
+  .weather-panel.is-open {
+    transform: none;
+    transition: transform 250ms ease;
+  }
+
+  .weather-panel-header {
+    padding-top: 18px;
+  }
 }
 
 /* Very narrow phones: slightly smaller numbers in the status bar, so the
@@ -1280,11 +1620,16 @@ body {
    -------------------------------------------------------------------------- */
 
 @media (prefers-reduced-motion: reduce) {
+  /* Switch transitions and CSS animations off completely: things simply
+     appear, and the pulse and radar sweep stand still. (An earlier version
+     shortened every transition to 0.01 ms instead. But elements transition
+     "all" properties by default, so that quietly gave EVERY element a
+     transition, which kept the weather panel's contents hidden for a moment
+     after opening, so keyboard focus couldn't move into it.) */
   *,
   *::before,
   *::after {
-    transition-duration: 0.01ms !important;
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important; /* stop repeating animations (pulse, radar sweep) */
+    transition: none !important;
+    animation: none !important;
   }
 }

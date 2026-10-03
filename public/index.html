@@ -44,9 +44,10 @@
         <!-- role="status" makes screen readers announce changes to this text -->
         <span class="status-message" id="status-message" role="status"></span>
       </div>
-      <!-- Weather at Muscat airport (weather-strip.js fills it in). It's a button
-           because clicking it will open the weather panel. -->
-      <button type="button" class="weather-strip" id="weather-strip" data-state="loading">
+      <!-- Weather at Muscat airport (weather-strip.js fills it in). Clicking it
+           opens the weather panel; aria-expanded tells screen readers if it's open. -->
+      <button type="button" class="weather-strip" id="weather-strip" data-state="loading"
+              aria-controls="weather-panel" aria-expanded="false">
         Fetching weather…
       </button>
 
@@ -110,6 +111,18 @@
         <li class="alt-ground"><span class="legend-dot"></span><span class="label-long">On ground</span><span class="label-short">Gnd</span></li>
       </ul>
       <p class="legend-note">Faded: no position for 1+ min</p>
+    </aside>
+
+    <!-- Weather panel (weather-panel.js fills it in). A drop-down on laptops,
+         a bottom sheet on phones. -->
+    <aside class="weather-panel" id="weather-panel" role="dialog" aria-labelledby="weather-panel-title">
+      <div class="weather-panel-header">
+        <span class="sheet-grabber" aria-hidden="true"></span>
+        <!-- tabindex="-1" lets JavaScript move keyboard focus here when the panel opens -->
+        <h2 id="weather-panel-title" tabindex="-1">Weather at Muscat airport</h2>
+        <button type="button" class="weather-panel-close" id="weather-panel-close" aria-label="Close weather panel">×</button>
+      </div>
+      <div class="weather-panel-body" id="weather-panel-body"></div>
     </aside>
 
     <!-- Shown until the first aircraft data arrives (status.js hides it) -->
